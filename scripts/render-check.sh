@@ -1,0 +1,12 @@
+#!/bin/sh
+# Builds the three panels off-screen from the windows on this Space and writes PNGs.
+cd "$(dirname "$0")/.." || exit 1
+OUT="${1:-$HOME/scratch/snap11-render}"
+mkdir -p "$OUT"
+swift build 2>&1 | grep -E 'error' && exit 1
+.build/debug/Snap11 --render "$OUT" &
+pid=$!
+i=0
+while [ $i -lt 15 ] && kill -0 "$pid" 2>/dev/null; do sleep 1; i=$((i+1)); done
+if kill -0 "$pid" 2>/dev/null; then kill "$pid"; echo "render check timed out"; exit 1; fi
+wait "$pid"
