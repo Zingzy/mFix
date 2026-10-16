@@ -19,7 +19,7 @@ final class FinderKeys {
     private enum Code {
         static let returnKey: Int64 = 36, enter: Int64 = 76, f2: Int64 = 120
         static let delete: Int64 = 51, forwardDelete: Int64 = 117
-        static let x: Int64 = 7, c: Int64 = 8, v: Int64 = 9, l: Int64 = 37, down: Int64 = 125
+        static let x: Int64 = 7, c: Int64 = 8, v: Int64 = 9, l: Int64 = 37, t: Int64 = 17, down: Int64 = 125
     }
 
     func start() {
@@ -73,6 +73,12 @@ final class FinderKeys {
         if type == .keyUp { return swallowedUps.remove(code) != nil }
 
         let mods = e.flags.intersection([.maskCommand, .maskShift, .maskAlternate, .maskControl])
+        if mods == [.maskCommand, .maskAlternate], code == Code.t, let folder = currentFolder() {
+            // Windows 11's "Open in Terminal" for the folder in front.
+            Terminals.open(folder)
+            swallowedUps.insert(code)
+            return true
+        }
         let plain = mods.isEmpty
         let cmdOnly = mods == .maskCommand
         let shiftOnly = mods == .maskShift
@@ -185,6 +191,26 @@ final class FinderKeys {
         if result == .success { return true }
         readMenu()
         return false
+    }
+
+    /// The folder Finder shows in front: a single selected folder, else the front window's
+    /// folder, else the desktop.
+    private func currentFolder() -> URL? {
+        guard let finder = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.finder").first else { return nil }
+        let app = AXUIElementCreateApplication(finder.processIdentifier)
+        AXUIElementSetMessagingTimeout(app, 0.2)
+        if let focused: AXUIElement = app.attr(kAXFocusedUIElementAttribute) {
+            let selected: [AXUIElement] = focused.attr(kAXSelectedRowsAttribute) ?? focused.attr(kAXSelectedChildrenAttribute) ?? []
+            let urls = selected.compactMap { item -> URL? in
+                (item.attr(kAXURLAttribute) as URL?) ?? ((item.attr(kAXChildrenAttribute) as [AXUIElement]?) ?? []).lazy.compactMap { $0.attr(kAXURLAttribute) as URL? }.first
+            }
+            if urls.count == 1, (try? urls[0].resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true { return urls[0] }
+        }
+        if let window: AXUIElement = app.attr(kAXFocusedWindowAttribute),
+           let doc: String = window.attr(kAXDocumentAttribute), let url = URL(string: doc) {
+            return url
+        }
+        return FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first
     }
 
     /// Files have focus when Finder's focused element is a file view (icon, list, column or

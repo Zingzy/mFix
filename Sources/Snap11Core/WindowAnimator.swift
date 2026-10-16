@@ -67,6 +67,17 @@ final class WindowAnimator {
             }, completionHandler: {
                 MainActor.assumeIsolated { self.complete(run) }
             })
+            // The snapshot is stretched between the two sizes; hand over to the real window,
+            // already redrawn at its new size behind it, before the stretch shows.
+            DispatchQueue.main.asyncAfter(deadline: .now() + self.duration * 0.4) {
+                guard !run.finished else { return }
+                NSAnimationContext.runAnimationGroup { ctx in
+                    ctx.duration = self.duration * 0.6
+                    ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
+                    ghost.animator().alphaValue = 0
+                    cover.animator().alphaValue = 0
+                }
+            }
         }
     }
 
