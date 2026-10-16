@@ -7,8 +7,12 @@ let args = CommandLine.arguments
 var delegate: AppDelegate?
 if let i = args.firstIndex(of: "--render"), args.count > i + 1 {
     MainActor.assumeIsolated { RenderCheck.run(into: args[i + 1]) }
+} else if let i = args.firstIndex(of: "--test-windows"), args.count > i + 1, let n = Int(args[i + 1]) {
+    MainActor.assumeIsolated { SnapCheck.showTestWindow(count: n) }
 } else if args.contains("--test-window") {
     MainActor.assumeIsolated { SnapCheck.showTestWindow() }
+} else if let i = args.firstIndex(of: "--assist-check"), args.count > i + 1, let pid = pid_t(args[i + 1]) {
+    MainActor.assumeIsolated { DriveCheck.assist(snap11: pid) }
 } else if let i = args.firstIndex(of: "--drive"), args.count > i + 1, let pid = pid_t(args[i + 1]) {
     MainActor.assumeIsolated { DriveCheck.run(snap11: pid) }
 } else if args.contains("--guard-test") {

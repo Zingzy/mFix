@@ -80,6 +80,57 @@ public enum DriveCheck {
         usleep(30_000)
     }
 
+    /// Three windows of one app: snap one right, pick the first card in Snap Assist, and
+    /// check the pick lands left, the first stays right, and Snap Assist does not come back.
+    public static func assist(snap11 pid: pid_t) {
+        CheckGuard.begin()
+        let child = Process()
+        child.executableURL = URL(fileURLWithPath: CommandLine.arguments[0])
+        child.arguments = ["--test-windows", "3"]
+        try? child.run()
+        var failures = 0
+        defer {
+            modifiers([])
+            child.terminate()
+            print(failures == 0 ? "assist check passed" : "assist check: \(failures) failed")
+            exit(failures == 0 ? 0 : 1)
+        }
+        func check(_ ok: Bool, _ what: String) {
+            print(ok ? "ok  " : "FAIL", what)
+            if !ok { failures += 1 }
+        }
+        var windows: [AXWindow] = []
+        for _ in 0..<40 where windows.count < 3 {
+            usleep(100_000)
+            windows = AXWindow.windows(of: child.processIdentifier).filter(\.isStandard)
+        }
+        guard windows.count == 3 else { check(false, "three test windows appeared"); return }
+        let first = windows[0]
+        first.focus()
+        usleep(600_000)
+        guard frontPID() == child.processIdentifier else { check(false, "test windows are frontmost"); return }
+        let work = Geo.workArea(Geo.screen(containing: first.frame))
+        let win: CGEventFlags = [.maskCommand, .maskAlternate]
+        modifiers(win)
+        key(Key.right, down: true, flags: win)
+        key(Key.right, down: false, flags: win)
+        modifiers([])
+        usleep(900_000)
+        let snapped = windows.first { $0.frame.isClose(to: Zone.right.frame(in: work), tolerance: 2) }
+        check(snapped != nil, "one window snapped right")
+        check(panels(of: pid).contains { $0.isClose(to: Zone.left.frame(in: work), tolerance: 2) }, "Snap Assist opened on the left")
+        key(Key.returnKey, down: true, flags: [])
+        key(Key.returnKey, down: false, flags: [])
+        usleep(900_000)
+        let frames = windows.map(\.frame)
+        print("     frames after the pick:", frames.map { "\($0)" }.joined(separator: " "))
+        check(windows.contains { $0.frame.isClose(to: Zone.left.frame(in: work), tolerance: 2) }, "the picked window is on the left")
+        check(snapped.map { $0.frame.isClose(to: Zone.right.frame(in: work), tolerance: 2) } ?? false, "the first window stayed on the right")
+        check(panels(of: pid).isEmpty, "Snap Assist closed once both halves were filled")
+        key(Key.escape, down: true, flags: [])
+        key(Key.escape, down: false, flags: [])
+    }
+
     public static func run(snap11 pid: pid_t) {
         CheckGuard.begin()
         let child = Process()

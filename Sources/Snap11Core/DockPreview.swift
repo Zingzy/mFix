@@ -95,7 +95,7 @@ final class DockPreview {
     private func show() {
         guard let (icon, url) = hovered, !DragDrop.shared.isDragging, !Switcher.shared.isOpen,
               let app = DockItems.Item(frame: icon, url: url, title: "").runningApp else { hide(); return }
-        let windows = WindowList.allSpaces().filter { $0.pid == app.processIdentifier }
+        let windows = WindowList.allSpaces(only: app.processIdentifier)
         if Hotkeys.debug { NSLog("Snap11: dock preview for %@: %d windows", url.lastPathComponent, windows.count) }
         guard !windows.isEmpty else { hide(); return }
         generation += 1

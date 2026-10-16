@@ -139,7 +139,7 @@ private struct SwitcherTab: View {
 private struct DockTab: View {
     @AppStorage(Settings.K.dockPreviews) private var dockPreviews = true
     @AppStorage(Settings.K.dockClicks) private var dockClicks = true
-    @AppStorage(Settings.K.dockDelay) private var dockDelay = 0.25
+    @AppStorage(Settings.K.dockDelay) private var dockDelay = 0.0
 
     var body: some View {
         Form {
@@ -152,7 +152,7 @@ private struct DockTab: View {
                     }
                 }
                 .disabled(!dockPreviews)
-                Text("Windows waits 400 ms. Once one preview is open, moving to another icon switches at once.")
+                Text("At 0 the windows show before the Dock's own name label can. Apps with no windows keep the label.")
                     .font(.caption).foregroundStyle(.secondary)
                 Toggle("Clicking the app I'm in minimizes it, or steps through its windows", isOn: $dockClicks)
             }

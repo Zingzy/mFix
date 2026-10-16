@@ -5,15 +5,19 @@ import AppKit
 /// next to where the Windows table says it goes. Exits non-zero on any mismatch.
 @MainActor
 public enum SnapCheck {
-    public static func showTestWindow() {
+    /// `count` windows in one process, like an app with several windows open.
+    public static func showTestWindow(count: Int = 1) {
         NSApp.setActivationPolicy(.regular)
-        let w = NSWindow(contentRect: NSRect(x: 300, y: 300, width: 600, height: 400),
-                         styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
-        w.title = "Snap11 check"
-        w.contentView = DragSourceView()
-        w.makeKeyAndOrderFront(nil)
+        let windows = (0..<count).map { i -> NSWindow in
+            let w = NSWindow(contentRect: NSRect(x: 300 + i * 40, y: 300 - i * 40, width: 600, height: 400),
+                             styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
+            w.title = count == 1 ? "Snap11 check" : "Snap11 check \(i + 1)"
+            w.contentView = DragSourceView()
+            w.makeKeyAndOrderFront(nil)
+            return w
+        }
         NSApp.activate()
-        objc_setAssociatedObject(NSApp!, "testWindow", w, .OBJC_ASSOCIATION_RETAIN)
+        objc_setAssociatedObject(NSApp!, "testWindow", windows, .OBJC_ASSOCIATION_RETAIN)
     }
 
     /// `Snap11 --minimize-check`: two throwaway windows, minimize all but one, then toggle back.
@@ -54,6 +58,7 @@ public enum SnapCheck {
     }
 
     public static func run() {
+        Settings.register()
         let child = Process()
         child.executableURL = URL(fileURLWithPath: CommandLine.arguments[0])
         child.arguments = ["--test-window"]

@@ -46,7 +46,7 @@ enum Settings {
             K.finderKeys: true,
             K.dockPreviews: true,
             K.dockClicks: true,
-            K.dockDelay: 0.25,
+            K.dockDelay: 0.0,
             K.snapGroups: true,
             K.liveThumbnails: true,
         ])

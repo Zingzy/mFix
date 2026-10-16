@@ -102,16 +102,6 @@ final class AXWindow: Hashable {
         element.set(kAXSizeAttribute, sizeValue)
     }
 
-    /// One position and one size write, for animation frames; the final frame still goes
-    /// through setFrame.
-    func setFrameQuickly(_ target: CGRect) {
-        guard let element else { return }
-        var origin = target.origin
-        var size = target.size
-        element.set(kAXPositionAttribute, AXValueCreate(.cgPoint, &origin)!)
-        element.set(kAXSizeAttribute, AXValueCreate(.cgSize, &size)!)
-    }
-
     func minimize() { element?.set(kAXMinimizedAttribute, kCFBooleanTrue) }
 
     func unminimize() { element?.set(kAXMinimizedAttribute, kCFBooleanFalse) }
@@ -130,6 +120,8 @@ final class AXWindow: Hashable {
         }
         if let element {
             AXUIElementPerformAction(element, kAXRaiseAction as CFString)
+        } else if let e = RemoteWindows.shared.find(pid: pid, id: id) {
+            AXUIElementPerformAction(e, kAXRaiseAction as CFString)
         } else {
             // Fronting switched Space; once there the window has an AX element to raise.
             let pid = self.pid, id = self.id

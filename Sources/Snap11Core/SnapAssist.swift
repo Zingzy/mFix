@@ -65,7 +65,7 @@ final class SnapAssist {
         guard Settings.snapAssist else { return }
         if isOpen { end(focusLast: false) }
         let zones = SnapEngine.shared.emptyZones(after: snapped, layout: layout, on: screen, ignoring: [window.id])
-        if Hotkeys.debug { NSLog("Snap11: assist zones %d", zones.count) }
+        if Hotkeys.debug { NSLog("Snap11: assist begins after %u (%@) at %@, zones %@", window.id, window.title, "\(snapped)", "\(zones)") }
         guard !zones.isEmpty else { return }
         self.screen = screen
         queue = zones
@@ -173,6 +173,7 @@ final class SnapAssist {
     private func pick(_ i: Int) {
         guard cards.indices.contains(i), let zone, let screen else { return }
         let window = cards[i].target
+        if Hotkeys.debug { NSLog("Snap11: assist pick %u (%@) into %@, queue %d", window.id, window.title, "\(zone)", queue.count) }
         if window.isMinimized { window.unminimize() }
         SnapEngine.shared.place(window, zone: zone, on: screen)
         if Settings.snapGroups, let anchor { SnapGroups.shared.join([window], with: anchor, on: screen) }

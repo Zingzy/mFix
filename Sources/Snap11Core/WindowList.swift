@@ -23,7 +23,8 @@ enum WindowList {
         return nil
     }
 
-    static func currentSpace(excluding: Set<CGWindowID> = []) -> [AXWindow] {
+    /// `only`: just this app's windows, which skips asking every other app.
+    static func currentSpace(excluding: Set<CGWindowID> = [], only: pid_t? = nil) -> [AXWindow] {
         let ownPID = ProcessInfo.processInfo.processIdentifier
         let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
             as? [[String: Any]] ?? []
@@ -41,6 +42,7 @@ enum WindowList {
             $0.activationPolicy == .regular && $0.processIdentifier != ownPID
         }
         for app in apps where !pids.contains(app.processIdentifier) { pids.append(app.processIdentifier) }
+        if let only { pids = pids.filter { $0 == only } }
 
         let space = SkyLight.activeSpace
         var visible: [CGWindowID: AXWindow] = [:]
@@ -74,8 +76,8 @@ enum WindowList {
     /// come from Accessibility; the rest from WindowServer, kept only if they belong to a
     /// Space and are ordered in, which drops menu bar strips, offscreen helpers and windows
     /// an app closed but kept alive in the Dock.
-    static func allSpaces() -> [AXWindow] {
-        let here = currentSpace()
+    static func allSpaces(only: pid_t? = nil) -> [AXWindow] {
+        let here = currentSpace(only: only)
         let known = Set(here.map(\.id))
         let own = ProcessInfo.processInfo.processIdentifier
         let regular = Set(NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular }.map(\.processIdentifier))
@@ -104,16 +106,19 @@ enum WindowList {
             guard (w[kCGWindowLayer as String] as? Int) == 0,
                   let id = w[kCGWindowNumber as String] as? CGWindowID, !known.contains(id),
                   let pid = w[kCGWindowOwnerPID as String] as? pid_t, pid != own, regular.contains(pid),
+                  only == nil || only == pid,
                   (w[kCGWindowAlpha as String] as? Double ?? 0) > 0,
                   let b = w[kCGWindowBounds as String] as? NSDictionary,
                   let frame = CGRect(dictionaryRepresentation: b), frame.width >= 100, frame.height >= 100,
                   !SkyLight.spaces(for: id).isEmpty, SkyLight.isOrderedIn(id) else { continue }
-            if let e = element(pid: pid, id: id) {
+            if let e = element(pid: pid, id: id) ?? RemoteWindows.shared.element(for: id) {
                 elsewhere.append(AXWindow(element: e, pid: pid))
             } else {
                 elsewhere.append(AXWindow(offSpace: id, pid: pid, title: w[kCGWindowName as String] as? String ?? "", frame: frame))
             }
         }
+        let unreached = Dictionary(grouping: elsewhere.filter { !$0.hasElement }, by: \.pid)
+        for (pid, windows) in unreached { RemoteWindows.shared.prefetch(pid: pid, ids: windows.map(\.id)) }
         let history = FocusHistory.shared
         let visibleHere = here.filter { !$0.isMinimized && !($0.app?.isHidden ?? false) }
         let tail = here.filter { $0.isMinimized || ($0.app?.isHidden ?? false) }
