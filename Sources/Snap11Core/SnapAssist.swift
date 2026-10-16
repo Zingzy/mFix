@@ -60,6 +60,7 @@ final class SnapAssist {
     }
 
     func begin(after window: AXWindow, zone snapped: Zone, on screen: NSScreen, layout: Layout? = nil) {
+        guard Settings.snapAssist else { return }
         if isOpen { end(focusLast: false) }
         let zones = SnapEngine.shared.emptyZones(after: snapped, layout: layout, on: screen, ignoring: [window.id])
         if Hotkeys.debug { NSLog("Snap11: assist zones %d", zones.count) }

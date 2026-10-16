@@ -19,8 +19,10 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         LayoutFlyout.shared.start()
         DragSnap.shared.start()
         DragDrop.shared.start()
+        Settings.register()
+        SystemShortcuts.recoverAfterCrash()
         registerHotkeys()
-        SkyLight.setSystemSwitcherEnabled(false)
+        observeSettings()
         modifierWatch = ListenTap([.flagsChanged]) { [weak self] _, event in
             let flags = event.flags
             MainActor.assumeIsolated { self?.modifiersChanged(flags) }
@@ -36,24 +38,49 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     public func applicationWillTerminate(_ note: Notification) {
-        SkyLight.setSystemSwitcherEnabled(true)
+        SystemShortcuts.restoreAll()
     }
 
     /// Turning off the system Cmd+Tab outlives the process, so put it back on every way out.
     private func installExitHandlers() {
         for sig in [SIGINT, SIGTERM, SIGHUP, SIGQUIT, SIGABRT, SIGSEGV, SIGBUS, SIGILL, SIGTRAP] {
             signal(sig) { s in
-                SkyLight.setSystemSwitcherEnabled(true)
+                SystemShortcuts.restoreFromSignal()
                 signal(s, SIG_DFL)
                 raise(s)
             }
         }
-        NSSetUncaughtExceptionHandler { _ in SkyLight.setSystemSwitcherEnabled(true) }
+        NSSetUncaughtExceptionHandler { _ in SystemShortcuts.restoreFromSignal() }
+    }
+
+    private var boundKeys: [String] = []
+
+    /// Key settings take effect at once: rebind whenever they change.
+    private func observeSettings() {
+        NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.keySettings != self.boundKeys else { return }
+                self.registerHotkeys()
+            }
+        }
+    }
+
+    private var keySettings: [String] {
+        [Settings.snapKeys.rawValue, "\(Settings.switcher)", "\(Settings.minimizeKeys)"]
     }
 
     private func registerHotkeys() {
-        let win = cmdKey | optionKey
+        boundKeys = keySettings
         let hk = Hotkeys.shared
+        hk.unregisterAll()
+        let win: Int
+        switch Settings.snapKeys {
+        case .cmdOption: win = cmdKey | optionKey
+        case .ctrlOption: win = controlKey | optionKey
+        case .ctrlCmd: win = controlKey | cmdKey
+        }
+        // Win+Alt: the third of Cmd, Option and Control on top of the Win chord.
+        let winAlt = cmdKey | optionKey | controlKey
         let arrows: [(Int64, Arrow)] = [(Key.left, .left), (Key.right, .right), (Key.up, .up), (Key.down, .down)]
         for (code, arrow) in arrows {
             hk.register(Int(code), win) { [weak self] in
@@ -64,18 +91,20 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         }
-        hk.register(Int(Key.up), win | controlKey) { [weak self] in
+        hk.register(Int(Key.up), winAlt) { [weak self] in
             MainActor.assumeIsolated { self?.pendingAssist = SnapEngine.shared.snapVertical(top: true) }
         }
-        hk.register(Int(Key.down), win | controlKey) { [weak self] in
+        hk.register(Int(Key.down), winAlt) { [weak self] in
             MainActor.assumeIsolated { self?.pendingAssist = SnapEngine.shared.snapVertical(top: false) }
         }
         hk.register(Int(Key.left), win | shiftKey) { MainActor.assumeIsolated { SnapEngine.shared.moveToScreen(towardLeft: true) } }
         hk.register(Int(Key.right), win | shiftKey) { MainActor.assumeIsolated { SnapEngine.shared.moveToScreen(towardLeft: false) } }
         hk.register(Int(Key.up), win | shiftKey) { MainActor.assumeIsolated { SnapEngine.shared.stretchVertically() } }
         hk.register(Int(Key.down), win | shiftKey) { MainActor.assumeIsolated { SnapEngine.shared.restoreFocused() } }
-        hk.register(Int(Key.home), win) { MainActor.assumeIsolated { MinimizeAll.shared.toggle(keepActive: true) } }
-        hk.register(Int(Key.d), win) { MainActor.assumeIsolated { MinimizeAll.shared.toggle(keepActive: false) } }
+        if Settings.minimizeKeys {
+            hk.register(Int(Key.home), win) { MainActor.assumeIsolated { MinimizeAll.shared.toggle(keepActive: true) } }
+            hk.register(Int(Key.d), win) { MainActor.assumeIsolated { MinimizeAll.shared.toggle(keepActive: false) } }
+        }
         hk.register(Int(Key.z), win) {
             MainActor.assumeIsolated {
                 SnapAssist.shared.end(focusLast: false)
@@ -83,6 +112,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
+        SystemShortcuts.suspend((Settings.switcher ? SystemShortcuts.switcher : [])
+            + (Settings.minimizeKeys && Settings.snapKeys == .cmdOption ? [SystemShortcuts.dockHiding] : []))
+        guard Settings.switcher else { return }
         hk.register(Int(Key.tab), cmdKey, repeats: true) { MainActor.assumeIsolated { Switcher.shared.step(backward: false) } }
         hk.register(Int(Key.tab), cmdKey | shiftKey, repeats: true) { MainActor.assumeIsolated { Switcher.shared.step(backward: true) } }
         hk.register(Int(Key.tab), cmdKey | controlKey, repeats: true) {
@@ -108,6 +140,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         menu.addItem(withTitle: "Snap11", action: nil, keyEquivalent: "").isEnabled = false
         menu.addItem(.separator())
+        let settings = menu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
+        settings.target = self
+        menu.addItem(.separator())
         let ax = menu.addItem(withTitle: "Accessibility permission…", action: #selector(openAccessibility), keyEquivalent: "")
         ax.target = self
         let sr = menu.addItem(withTitle: "Screen Recording permission…", action: #selector(openScreenRecording), keyEquivalent: "")
@@ -116,6 +151,10 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(withTitle: "Quit Snap11", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         item.menu = menu
         statusItem = item
+    }
+
+    @objc private func openSettings() {
+        MainActor.assumeIsolated { SettingsWindow.shared.show() }
     }
 
     @objc private func openAccessibility() {

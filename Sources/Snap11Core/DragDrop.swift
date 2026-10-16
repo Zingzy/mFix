@@ -10,8 +10,6 @@ import QuickLookThumbnailing
 final class DragDrop {
     static let shared = DragDrop()
 
-    /// Windows springs a taskbar button after about half a second of hovering with a drag.
-    private let springDelay: TimeInterval = 0.5
 
     private var tap: ListenTap?
     private var downCount = 0
@@ -56,11 +54,11 @@ final class DragDrop {
             guard pb.changeCount != downCount, let content = DragContent(pb) else { return }
             isDragging = true
             generation += 1
-            showPreview(content)
+            if Settings.dragPreview { showPreview(content) }
             readDock(force: true)
         }
-        movePreview(to: p)
-        spring(at: p)
+        if Settings.dragPreview { movePreview(to: p) }
+        if Settings.dockSpring { spring(at: p) }
         Switcher.shared.dragMoved(to: p)
     }
 
@@ -139,7 +137,7 @@ final class DragDrop {
         springTimer?.invalidate()
         springTimer = nil
         guard let url else { return }
-        springTimer = Timer.scheduledTimer(withTimeInterval: springDelay, repeats: false) { [weak self] _ in
+        springTimer = Timer.scheduledTimer(withTimeInterval: Settings.springDelay, repeats: false) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self, self.isDragging, self.springURL == url else { return }
                 self.bringForward(appAt: url)

@@ -42,10 +42,11 @@ enum SkyLight {
 
     static var connection: CGSConnectionID { mainConnection?() ?? 0 }
 
-    // Symbolic hotkey ids: 1 = Cmd+Tab, 2 = Cmd+Shift+Tab, 6 = Cmd+` (com.apple.symbolichotkeys).
-    static func setSystemSwitcherEnabled(_ enabled: Bool) {
-        for id: Int32 in [1, 2] { _ = setSymbolicHotKey?(id, enabled) }
-    }
+    private typealias IsSymbolicHotKeyFn = @convention(c) (Int32) -> Bool
+    private static let isSymbolicHotKey = sym("SLSIsSymbolicHotKeyEnabled", as: IsSymbolicHotKeyFn.self)
+
+    static func setSymbolicHotKey(_ id: Int32, enabled: Bool) { _ = setSymbolicHotKey?(id, enabled) }
+    static func isSymbolicHotKeyEnabled(_ id: Int32) -> Bool { isSymbolicHotKey?(id) ?? true }
 
     /// Captures a window even while it is minimized, which ScreenCaptureKit can't.
     /// Options: ignore global clip shape (1<<11), best resolution (1<<8), full size (1<<19).

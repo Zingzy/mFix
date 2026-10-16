@@ -90,6 +90,7 @@ final class DragSnap {
 
     private func begin(at location: CGPoint, target: CGWindowID) {
         reset()
+        guard Settings.dragSnap else { return }
         var id = target
         if id == 0 { id = WindowList.windowAt(location)?.id ?? 0 }
         if Hotkeys.debug { NSLog("Snap11: drag mouseDown at %@ window %u", NSStringFromPoint(location), id) }

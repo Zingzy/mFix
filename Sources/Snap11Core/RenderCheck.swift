@@ -1,10 +1,13 @@
 import AppKit
+import SwiftUI
 
 /// `Snap11 --render <dir>`: builds the switcher, Snap Assist and the layouts flyout from the
 /// real windows on this Space without showing them, and writes each as a PNG. Registers no
 /// hotkeys and leaves the system Cmd+Tab alone.
 @MainActor
 public enum RenderCheck {
+    private static var settingsHosts: [NSHostingView<SettingsView>] = []
+
     public static func run(into dir: String) {
         OverlayPanel.offscreen = true
         FocusHistory.shared.start()
@@ -41,12 +44,25 @@ public enum RenderCheck {
             let anchor = front.fullScreenButtonFrame ?? CGRect(x: 200, y: 40, width: 14, height: 14)
             LayoutFlyout.shared.open(for: front, anchor: anchor, keyboard: true)
         }
+        for tab in 0..<4 {
+            let host = NSHostingView(rootView: SettingsView(tab: tab))
+            host.frame = NSRect(x: 0, y: 0, width: 520, height: 440)
+            let w = NSWindow(contentRect: host.frame, styleMask: [.titled], backing: .buffered, defer: false)
+            w.contentView = host
+            settingsHosts.append(host)
+        }
         // Thumbnails arrive asynchronously; give them a moment before drawing.
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
             MainActor.assumeIsolated {
                 write(Switcher.shared.panel, to: "\(dir)/switcher.png")
                 write(SnapAssist.shared.panel, to: "\(dir)/snap-assist.png")
                 write(LayoutFlyout.shared.panel, to: "\(dir)/flyout.png")
+                for (i, host) in settingsHosts.enumerated() {
+                    host.layoutSubtreeIfNeeded()
+                    guard let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { continue }
+                    host.cacheDisplay(in: host.bounds, to: rep)
+                    try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: "\(dir)/settings-\(i).png"))
+                }
                 NSApp.terminate(nil)
             }
         }

@@ -7,9 +7,6 @@ import AppKit
 final class LayoutFlyout {
     static let shared = LayoutFlyout()
 
-    /// Windows waits 600 ms on the maximize button (known only from reverse engineering);
-    /// macOS's own Move & Resize popover takes a second or more, so this one wins.
-    private let hoverDelay: TimeInterval = 0.6
 
     let panel = OverlayPanel(takesKeyboard: false)
     /// Sits over the green button while the flyout is open, so the app sees the pointer leave
@@ -78,6 +75,7 @@ final class LayoutFlyout {
         lastMove = now
         let p = Geo.flip(NSEvent.mouseLocation)
 
+        if !isOpen && !Settings.layoutsHover { return }
         if isOpen {
             let overPanel = panel.frame.contains(NSEvent.mouseLocation)
             if overPanel || anchor.insetBy(dx: -6, dy: -6).contains(p) || panel.takesKeyboard {
@@ -108,7 +106,7 @@ final class LayoutFlyout {
         if Hotkeys.debug { NSLog("Snap11: hover on green button of %u, timer started", wid) }
         cancelHover()
         hoverWindow = wid
-        hoverTimer = Timer.scheduledTimer(withTimeInterval: hoverDelay, repeats: false) { [weak self] _ in
+        hoverTimer = Timer.scheduledTimer(withTimeInterval: Settings.hoverDelay, repeats: false) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
                 self.hoverTimer = nil

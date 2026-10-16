@@ -27,8 +27,6 @@ func acrylicView(radius: CGFloat) -> NSVisualEffectView {
 final class Switcher {
     static let shared = Switcher()
 
-    /// Windows shows the panel at once; a short wait keeps a quick Cmd+Tab from flashing it.
-    private let showDelay: TimeInterval = 0.09
 
     let panel = OverlayPanel(takesKeyboard: true)
     private var background: NSVisualEffectView?
@@ -71,7 +69,7 @@ final class Switcher {
             move(backward ? -1 : 1)
             return
         }
-        windows = WindowList.allSpaces()
+        windows = Settings.allSpaces ? WindowList.allSpaces() : WindowList.currentSpace()
         if Hotkeys.debug { NSLog("Snap11: switcher windows %d", windows.count) }
         guard !windows.isEmpty else { return }
         isOpen = true
@@ -83,11 +81,11 @@ final class Switcher {
         self.sticky = sticky
         generation += 1
         selected = windows.count > 1 ? (backward ? windows.count - 1 : 1) : 0
-        if sticky || showDelay <= 0 {
+        if sticky || Settings.showDelay <= 0 {
             show()
         } else {
             let g = generation
-            showTimer = Timer.scheduledTimer(withTimeInterval: showDelay, repeats: false) { _ in
+            showTimer = Timer.scheduledTimer(withTimeInterval: Settings.showDelay, repeats: false) { _ in
                 MainActor.assumeIsolated { if self.generation == g && self.isOpen { self.show() } }
             }
         }

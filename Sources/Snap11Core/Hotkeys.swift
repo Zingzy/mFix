@@ -33,6 +33,14 @@ final class Hotkeys {
         nextID += 1
     }
 
+    func unregisterAll() {
+        stopRepeating()
+        refs.forEach { UnregisterEventHotKey($0) }
+        refs = []
+        actions = [:]
+        repeating = []
+    }
+
     func stopRepeating() {
         repeatTimer?.invalidate()
         repeatTimer = nil
