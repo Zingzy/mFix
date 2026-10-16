@@ -25,6 +25,7 @@ enum Settings {
         static let snapGroups = "snap.groups"
         static let liveThumbnails = "thumbnails.live"
         static let terminal = "finder.terminal"
+        static let finderSearch = "finder.search"
     }
 
     static func register() {
@@ -45,10 +46,11 @@ enum Settings {
             K.finderKeys: true,
             K.dockPreviews: true,
             K.dockClicks: true,
-            K.dockDelay: 0.0,
+            K.dockDelay: 0.25,
             K.snapGroups: true,
             K.liveThumbnails: true,
             K.terminal: "com.mitchellh.ghostty",
+            K.finderSearch: true,
         ])
     }
 
@@ -73,6 +75,7 @@ enum Settings {
     static var snapGroups: Bool { d.bool(forKey: K.snapGroups) }
     static var liveThumbnails: Bool { d.bool(forKey: K.liveThumbnails) }
     static var terminal: String { d.string(forKey: K.terminal) ?? "" }
+    static var finderSearch: Bool { d.bool(forKey: K.finderSearch) }
 
     /// Launch at login lives with the system, not in UserDefaults.
     static var launchAtLogin: Bool {

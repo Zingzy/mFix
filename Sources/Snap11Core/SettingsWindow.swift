@@ -45,6 +45,7 @@ private struct GeneralTab: View {
     @AppStorage(Settings.K.dockNumbers) private var dockNumbers = true
     @AppStorage(Settings.K.finderKeys) private var finderKeys = true
     @AppStorage(Settings.K.terminal) private var terminal = "com.mitchellh.ghostty"
+    @AppStorage(Settings.K.finderSearch) private var finderSearch = true
 
     var body: some View {
         Form {
@@ -69,6 +70,10 @@ private struct GeneralTab: View {
                     ForEach(Terminals.installed, id: \.bundleID) { Text($0.name).tag($0.bundleID) }
                 }
                 .disabled(!finderKeys)
+                Toggle("Cmd+F in Finder searches every file by name", isOn: $finderSearch)
+                    .disabled(!finderKeys)
+                Text("Names in your home folder and Applications are kept in memory and searched as you type, like fsearch. node_modules, .git and build caches are skipped.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
@@ -142,7 +147,7 @@ private struct SwitcherTab: View {
 private struct DockTab: View {
     @AppStorage(Settings.K.dockPreviews) private var dockPreviews = true
     @AppStorage(Settings.K.dockClicks) private var dockClicks = true
-    @AppStorage(Settings.K.dockDelay) private var dockDelay = 0.0
+    @AppStorage(Settings.K.dockDelay) private var dockDelay = 0.25
 
     var body: some View {
         Form {
@@ -155,7 +160,7 @@ private struct DockTab: View {
                     }
                 }
                 .disabled(!dockPreviews)
-                Text("At 0 the windows show before the Dock's own name label can. Apps with no windows keep the label.")
+                Text("Windows waits about 400 ms. Once one preview is open, moving to another icon switches at once.")
                     .font(.caption).foregroundStyle(.secondary)
                 Toggle("Clicking the app I'm in minimizes it, or steps through its windows", isOn: $dockClicks)
             }

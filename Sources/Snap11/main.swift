@@ -23,6 +23,10 @@ if let i = args.firstIndex(of: "--render"), args.count > i + 1 {
         print("no real input seen")
         exit(0)
     }
+} else if args.contains("--index-bench") {
+    IndexBench.run()
+} else if args.contains("--live-bench") {
+    MainActor.assumeIsolated { LiveBench.run() }
 } else if args.contains("--finder-probe") {
     MainActor.assumeIsolated { FinderProbe.run() }
 } else if let i = args.firstIndex(of: "--dock-check"), args.count > i + 1, let pid = pid_t(args[i + 1]) {

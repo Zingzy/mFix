@@ -19,7 +19,7 @@ final class FinderKeys {
     private enum Code {
         static let returnKey: Int64 = 36, enter: Int64 = 76, f2: Int64 = 120
         static let delete: Int64 = 51, forwardDelete: Int64 = 117
-        static let x: Int64 = 7, c: Int64 = 8, v: Int64 = 9, l: Int64 = 37, t: Int64 = 17, down: Int64 = 125
+        static let x: Int64 = 7, c: Int64 = 8, v: Int64 = 9, l: Int64 = 37, t: Int64 = 17, f: Int64 = 3, down: Int64 = 125
     }
 
     func start() {
@@ -73,6 +73,13 @@ final class FinderKeys {
         if type == .keyUp { return swallowedUps.remove(code) != nil }
 
         let mods = e.flags.intersection([.maskCommand, .maskShift, .maskAlternate, .maskControl])
+        if mods == .maskCommand, code == Code.f, Settings.finderSearch, !typingInFinder() {
+            // Snap11's index search in place of Finder's.
+            let frame = frontFinderWindowFrame()
+            DispatchQueue.main.async { FinderSearch.shared.show(over: frame) }
+            swallowedUps.insert(code)
+            return true
+        }
         if mods == [.maskCommand, .maskAlternate], code == Code.t, let folder = currentFolder() {
             // Windows 11's "Open in Terminal" for the folder in front.
             Terminals.open(folder)
@@ -191,6 +198,29 @@ final class FinderKeys {
         if result == .success { return true }
         readMenu()
         return false
+    }
+
+    private func typingInFinder() -> Bool {
+        guard let finder = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.finder").first else { return false }
+        let app = AXUIElementCreateApplication(finder.processIdentifier)
+        AXUIElementSetMessagingTimeout(app, 0.1)
+        guard let focused: AXUIElement = app.attr(kAXFocusedUIElementAttribute) else { return false }
+        return ["AXTextField", "AXTextArea", "AXComboBox"].contains(focused.attr(kAXRoleAttribute) as String? ?? "")
+    }
+
+    /// The front Finder window, or the middle of the main screen when only the desktop is up.
+    private func frontFinderWindowFrame() -> CGRect {
+        if let finder = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.finder").first,
+           let w = AXWindow.windows(of: finder.processIdentifier).first(where: { $0.isStandard }) {
+            let app = AXUIElementCreateApplication(finder.processIdentifier)
+            if let focused: AXUIElement = app.attr(kAXFocusedWindowAttribute) {
+                let f = AXWindow(element: focused, pid: finder.processIdentifier).frame
+                if f.width > 0 { return f }
+            }
+            return w.frame
+        }
+        let s = Geo.flip(NSScreen.screens[0].visibleFrame)
+        return CGRect(x: s.midX - 420, y: s.minY + 120, width: 840, height: 560)
     }
 
     /// The folder Finder shows in front: a single selected folder, else the front window's
