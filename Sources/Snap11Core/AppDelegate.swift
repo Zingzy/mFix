@@ -74,6 +74,8 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         hk.register(Int(Key.right), win | shiftKey) { MainActor.assumeIsolated { SnapEngine.shared.moveToScreen(towardLeft: false) } }
         hk.register(Int(Key.up), win | shiftKey) { MainActor.assumeIsolated { SnapEngine.shared.stretchVertically() } }
         hk.register(Int(Key.down), win | shiftKey) { MainActor.assumeIsolated { SnapEngine.shared.restoreFocused() } }
+        hk.register(Int(Key.home), win) { MainActor.assumeIsolated { MinimizeAll.shared.toggle(keepActive: true) } }
+        hk.register(Int(Key.d), win) { MainActor.assumeIsolated { MinimizeAll.shared.toggle(keepActive: false) } }
         hk.register(Int(Key.z), win) {
             MainActor.assumeIsolated {
                 SnapAssist.shared.end(focusLast: false)

@@ -16,6 +16,43 @@ public enum SnapCheck {
         objc_setAssociatedObject(NSApp!, "testWindow", w, .OBJC_ASSOCIATION_RETAIN)
     }
 
+    /// `Snap11 --minimize-check`: two throwaway windows, minimize all but one, then toggle back.
+    public static func minimizeCheck() {
+        let children = (0..<2).map { _ -> Process in
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: CommandLine.arguments[0])
+            p.arguments = ["--test-window"]
+            try? p.run()
+            return p
+        }
+        defer { children.forEach { $0.terminate() } }
+        var windows: [AXWindow] = []
+        for _ in 0..<40 where windows.count < 2 {
+            usleep(100_000)
+            windows = children.compactMap { c in AXWindow.windows(of: c.processIdentifier).first(where: { $0.isStandard }) }
+        }
+        guard windows.count == 2 else { print("test windows never appeared"); exit(1) }
+        let (keep, other) = (windows[0], windows[1])
+        MinimizeAll.shared.toggle(keepActive: true, among: windows, active: keep)
+        usleep(900_000)
+        let first = other.isMinimized && !keep.isMinimized
+        print(first ? "ok  " : "FAIL", "first press minimized the other window and kept the active one")
+        MinimizeAll.shared.toggle(keepActive: true, among: windows, active: keep)
+        usleep(900_000)
+        let second = !other.isMinimized && !keep.isMinimized
+        print(second ? "ok  " : "FAIL", "second press brought it back")
+        MinimizeAll.shared.toggle(keepActive: false, among: windows, active: keep)
+        usleep(900_000)
+        let third = other.isMinimized && keep.isMinimized
+        print(third ? "ok  " : "FAIL", "show desktop minimized both")
+        MinimizeAll.shared.toggle(keepActive: false, among: windows, active: keep)
+        usleep(900_000)
+        let fourth = !other.isMinimized && !keep.isMinimized
+        print(fourth ? "ok  " : "FAIL", "pressing again restored both")
+        children.forEach { $0.terminate() }
+        exit(first && second && third && fourth ? 0 : 1)
+    }
+
     public static func run() {
         let child = Process()
         child.executableURL = URL(fileURLWithPath: CommandLine.arguments[0])
