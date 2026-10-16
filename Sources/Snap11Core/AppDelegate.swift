@@ -20,7 +20,6 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         DragSnap.shared.start()
         DragDrop.shared.start()
         FinderKeys.shared.start()
-        if Settings.finderSearch { FileIndex.shared.start() }
         DockPreview.shared.start()
         SnapGroups.shared.start()
         Settings.register()

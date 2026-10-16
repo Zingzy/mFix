@@ -51,24 +51,12 @@ public enum RenderCheck {
             w.contentView = host
             settingsHosts.append(host)
         }
-        if ProcessInfo.processInfo.environment["SNAP11_INDEX_ROOTS"] != nil {
-            Settings.register()
-            FileIndex.shared.start()
-            while !FileIndex.shared.ready { RunLoop.current.run(until: Date().addingTimeInterval(0.05)) }
-            FinderSearch.shared.preview(query: "package json")
-        }
         // Thumbnails arrive asynchronously; give them a moment before drawing.
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
             MainActor.assumeIsolated {
                 write(Switcher.shared.panel, to: "\(dir)/switcher.png")
                 write(SnapAssist.shared.panel, to: "\(dir)/snap-assist.png")
                 write(LayoutFlyout.shared.panel, to: "\(dir)/flyout.png")
-                if let view = FinderSearch.shared.panelForRender.contentView, view.bounds.width > 0,
-                   let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
-                    view.layoutSubtreeIfNeeded()
-                    view.cacheDisplay(in: view.bounds, to: rep)
-                    try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: "\(dir)/search.png"))
-                }
                 for (i, host) in settingsHosts.enumerated() {
                     host.layoutSubtreeIfNeeded()
                     guard let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { continue }
