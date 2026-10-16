@@ -22,6 +22,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         FinderKeys.shared.start()
         DockPreview.shared.start()
         SnapGroups.shared.start()
+        AlwaysOnTop.shared.start()
         Settings.register()
         SystemShortcuts.recoverAfterCrash()
         registerHotkeys()
@@ -69,7 +70,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private var keySettings: [String] {
-        [Settings.snapKeys.rawValue, "\(Settings.switcher)", "\(Settings.minimizeKeys)", "\(Settings.dockNumbers)"]
+        [Settings.snapKeys.rawValue, "\(Settings.switcher)", "\(Settings.minimizeKeys)", "\(Settings.dockNumbers)", "\(Settings.alwaysOnTop)"]
     }
 
     private func registerHotkeys() {
@@ -117,6 +118,10 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         hk.register(Int(Key.escape), cmdKey | shiftKey) {
             NSWorkspace.shared.openApplication(at: URL(fileURLWithPath: "/System/Applications/Utilities/Activity Monitor.app"),
                                                configuration: NSWorkspace.OpenConfiguration())
+        }
+        if Settings.alwaysOnTop {
+            // PowerToys' Always on Top is Win+Ctrl+T.
+            hk.register(Int(Key.t), winAlt) { MainActor.assumeIsolated { AlwaysOnTop.shared.toggleFocused() } }
         }
         hk.register(Int(Key.z), win) {
             MainActor.assumeIsolated {

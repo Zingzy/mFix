@@ -43,6 +43,7 @@ private struct GeneralTab: View {
     @AppStorage(Settings.K.snapKeys) private var snapKeys = SnapKeys.cmdOption.rawValue
     @AppStorage(Settings.K.minimizeKeys) private var minimizeKeys = true
     @AppStorage(Settings.K.dockNumbers) private var dockNumbers = true
+    @AppStorage(Settings.K.alwaysOnTop) private var alwaysOnTop = true
     @AppStorage(Settings.K.finderKeys) private var finderKeys = true
     @AppStorage(Settings.K.terminal) private var terminal = "com.mitchellh.ghostty"
 
@@ -60,6 +61,7 @@ private struct GeneralTab: View {
                     .font(.caption).foregroundStyle(.secondary)
                 Toggle("Win+Home minimizes other windows, Win+D shows the desktop", isOn: $minimizeKeys)
                 Toggle("Win+1 to 9 open or switch to the apps in the Dock", isOn: $dockNumbers)
+                Toggle("Win+Ctrl+T keeps the window in front on top of the others", isOn: $alwaysOnTop)
             }
             Section {
                 Toggle("Finder keys work like Explorer", isOn: $finderKeys)

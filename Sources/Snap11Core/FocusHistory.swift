@@ -26,10 +26,14 @@ final class FocusHistory {
         if let front = NSWorkspace.shared.frontmostApplication { touchFocused(of: front.processIdentifier) }
     }
 
+    /// Told after every focus change, for features that react to it (Always on Top).
+    var onFocus: ((CGWindowID) -> Void)?
+
     func touch(_ id: CGWindowID) {
         guard id != 0 else { return }
         clock += 1
         stamps[id] = clock
+        onFocus?(id)
     }
 
     func stamp(_ id: CGWindowID) -> UInt64? { stamps[id] }

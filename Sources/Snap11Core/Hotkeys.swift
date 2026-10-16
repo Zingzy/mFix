@@ -137,6 +137,7 @@ enum Key {
     static let z: Int64 = 6
     static let d: Int64 = 2
     static let home: Int64 = 115
+    static let t: Int64 = 17
     static let w: Int64 = 13
     static let delete: Int64 = 51
     static let forwardDelete: Int64 = 117
