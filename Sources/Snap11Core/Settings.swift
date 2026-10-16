@@ -20,6 +20,7 @@ enum Settings {
         static let minimizeKeys = "minimize.enabled"
         static let dockNumbers = "dock.numbers"
         static let finderKeys = "finder.keys"
+        static let finderZoom = "finder.zoom"
     }
 
     static func register() {
@@ -39,6 +40,7 @@ enum Settings {
             K.minimizeKeys: true,
             K.dockNumbers: true,
             K.finderKeys: true,
+            K.finderZoom: true,
         ])
     }
 
@@ -58,6 +60,7 @@ enum Settings {
     static var minimizeKeys: Bool { d.bool(forKey: K.minimizeKeys) }
     static var dockNumbers: Bool { d.bool(forKey: K.dockNumbers) }
     static var finderKeys: Bool { d.bool(forKey: K.finderKeys) }
+    static var finderZoom: Bool { d.bool(forKey: K.finderZoom) }
 
     /// Launch at login lives with the system, not in UserDefaults.
     static var launchAtLogin: Bool {

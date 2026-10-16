@@ -12,5 +12,6 @@
     <key>LSMinimumSystemVersion</key><string>26.0</string>
     <key>LSUIElement</key><true/>
     <key>NSHighResolutionCapable</key><true/>
+    <key>NSAppleEventsUsageDescription</key><string>Snap11 changes a Finder window's icon size and view when you pinch or Cmd+scroll in it.</string>
 </dict>
 </plist>

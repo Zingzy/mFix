@@ -49,6 +49,7 @@ final class FinderKeys {
         guard on, tap == nil, AXIsProcessTrusted() else { return }
         readMenu()
         let mask = CGEventMask(1 << CGEventType.keyDown.rawValue) | CGEventMask(1 << CGEventType.keyUp.rawValue)
+            | CGEventMask(1 << CGEventType.scrollWheel.rawValue)
         tap = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap, eventsOfInterest: mask,
                                 callback: { _, type, event, _ in
             if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
@@ -69,6 +70,13 @@ final class FinderKeys {
 
     private func handle(_ type: CGEventType, _ e: CGEvent) -> Bool {
         if e.getIntegerValueField(.eventSourceUserData) == FinderKeys.tag { return false }
+        if type == .scrollWheel {
+            guard e.flags.intersection([.maskCommand, .maskShift, .maskAlternate, .maskControl]) == .maskCommand,
+                  let under = WindowList.windowAt(e.location),
+                  NSRunningApplication(processIdentifier: under.pid)?.bundleIdentifier == "com.apple.finder" else { return false }
+            let lines = e.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1)
+            return FinderZoom.shared.scroll(deltaY: lines)
+        }
         let code = e.getIntegerValueField(.keyboardEventKeycode)
         if type == .keyUp { return swallowedUps.remove(code) != nil }
 
@@ -95,11 +103,10 @@ final class FinderKeys {
         case (Code.f2, true): post(Code.returnKey, [])
         case (Code.delete, true), (Code.forwardDelete, true): post(Code.delete, .maskCommand)
         case (Code.x, false):
+            let before = NSPasteboard.general.changeCount
+            cutCount = nil
             post(Code.c, .maskCommand)
-            // Finder writes the pasteboard on the main loop after the copy lands.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                MainActor.assumeIsolated { FinderKeys.shared.cutCount = NSPasteboard.general.changeCount }
-            }
+            awaitCopy(after: before, tries: 20)
         case (Code.v, false):
             if Hotkeys.debug { NSLog("Snap11: finder paste, cut %ld now %ld", cutCount ?? -1, NSPasteboard.general.changeCount) }
             guard let cut = cutCount, cut == NSPasteboard.general.changeCount else { return false }
@@ -111,6 +118,24 @@ final class FinderKeys {
         }
         swallowedUps.insert(code)
         return true
+    }
+
+    /// Finder writes the copied files to the pasteboard some time after the key; the cut
+    /// counts once the pasteboard has actually changed.
+    private func awaitCopy(after before: Int, tries: Int) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            MainActor.assumeIsolated {
+                let now = NSPasteboard.general.changeCount
+                if now != before {
+                    FinderKeys.shared.cutCount = now
+                    if Hotkeys.debug { NSLog("Snap11: finder cut recorded at %ld", now) }
+                } else if tries > 0 {
+                    FinderKeys.shared.awaitCopy(after: before, tries: tries - 1)
+                } else if Hotkeys.debug {
+                    NSLog("Snap11: finder cut: pasteboard never changed after Cmd+C")
+                }
+            }
+        }
     }
 
     private func post(_ code: Int64, _ flags: CGEventFlags) {
@@ -158,8 +183,14 @@ final class FinderKeys {
 
     @discardableResult
     private func press(_ s: Shortcut) -> Bool {
-        guard let item = menuItems[s] else { readMenu(); return false }
-        if AXUIElementPerformAction(item, kAXPressAction as CFString) == .success { return true }
+        guard let item = menuItems[s] else {
+            if Hotkeys.debug { NSLog("Snap11: finder menu item %u/%d not cached yet", s.char, s.mods) }
+            readMenu()
+            return false
+        }
+        let result = AXUIElementPerformAction(item, kAXPressAction as CFString)
+        if Hotkeys.debug { NSLog("Snap11: finder menu press %u/%d -> %d", s.char, s.mods, result.rawValue) }
+        if result == .success { return true }
         readMenu()
         return false
     }

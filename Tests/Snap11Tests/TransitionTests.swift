@@ -151,3 +151,14 @@ import Testing
         #expect(f.minY == 53)
     }
 }
+
+@MainActor
+@Suite struct FinderZoomTests {
+    @Test func stagesFollowExplorer() {
+        #expect(FinderZoom.stage(view: "icnv", iconSize: 256) == 0)
+        #expect(FinderZoom.stage(view: "icnv", iconSize: 72) == 2)
+        #expect(FinderZoom.stage(view: "icnv", iconSize: 16) == 3)
+        #expect(FinderZoom.stage(view: "lsvw", iconSize: 64) == 4)
+        #expect(FinderZoom.stage(view: "clvw", iconSize: 64) == 4)
+    }
+}

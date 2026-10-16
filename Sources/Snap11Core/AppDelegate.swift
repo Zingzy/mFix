@@ -20,6 +20,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         DragSnap.shared.start()
         DragDrop.shared.start()
         FinderKeys.shared.start()
+        FinderZoom.shared.start()
         Settings.register()
         SystemShortcuts.recoverAfterCrash()
         registerHotkeys()
