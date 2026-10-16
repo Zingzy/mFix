@@ -88,14 +88,14 @@ public enum SnapCheck {
         var failures = 0
         for (arrow, name, expected) in steps {
             SnapEngine.shared.handle(arrow, window: window)
-            RunLoop.current.run(until: Date().addingTimeInterval(0.35))
+            usleep(200_000)
             let f = window.frame
             let ok = f.isClose(to: expected, tolerance: 2)
             if !ok { failures += 1 }
             print(ok ? "ok  " : "FAIL", arrow, "->", name, "got", f, ok ? "" : "want \(expected)")
         }
         SnapEngine.shared.handle(.down, window: window)
-        RunLoop.current.run(until: Date().addingTimeInterval(0.6))
+        usleep(600_000)
         let minimized = window.isMinimized
         print(minimized ? "ok   down -> minimized" : "FAIL down -> minimized")
         if !minimized { failures += 1 }

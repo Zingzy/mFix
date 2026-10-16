@@ -155,19 +155,10 @@ final class DragSnap {
 
     private func showPreview(_ frame: NSRect) {
         preview.appearance = Theme.appearance
-        if preview.isVisible {
-            NSAnimationContext.runAnimationGroup { ctx in
-                ctx.duration = 0.15
-                preview.animator().setFrame(frame, display: true)
-            }
-        } else {
-            preview.setFrame(frame, display: true)
-            preview.alphaValue = 0
+        preview.setFrame(frame, display: true)
+        if !preview.isVisible {
+            preview.alphaValue = 1
             preview.order(.below, relativeTo: Int(wid))
-            NSAnimationContext.runAnimationGroup { ctx in
-                ctx.duration = 0.12
-                preview.animator().alphaValue = 1
-            }
         }
     }
 

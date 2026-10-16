@@ -81,14 +81,12 @@ private struct SnappingTab: View {
     @AppStorage(Settings.K.hoverDelay) private var hoverDelay = 0.6
     @AppStorage(Settings.K.dragSnap) private var dragSnap = true
     @AppStorage(Settings.K.snapGroups) private var snapGroups = true
-    @AppStorage(Settings.K.animate) private var animate = true
 
     var body: some View {
         Form {
             Section {
                 Toggle("When I snap a window, show what I can snap next to it", isOn: $snapAssist)
                 Toggle("Snap a window by dragging it to a screen edge or corner", isOn: $dragSnap)
-                Toggle("Slide windows into place when they snap", isOn: $animate)
                 Toggle("Group windows I snap together; resize them together and show the group in the switcher", isOn: $snapGroups)
             }
             Section {

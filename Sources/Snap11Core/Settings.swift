@@ -10,7 +10,6 @@ enum Settings {
         static let layoutsHover = "snap.layoutsHover"
         static let hoverDelay = "snap.hoverDelay"
         static let dragSnap = "snap.drag"
-        static let animate = "snap.animate"
         static let switcher = "switcher.enabled"
         static let allSpaces = "switcher.allSpaces"
         static let showDelay = "switcher.showDelay"
@@ -35,7 +34,6 @@ enum Settings {
             K.layoutsHover: true,
             K.hoverDelay: 0.6,
             K.dragSnap: true,
-            K.animate: true,
             K.switcher: true,
             K.allSpaces: true,
             K.showDelay: 0.09,
@@ -60,7 +58,6 @@ enum Settings {
     static var layoutsHover: Bool { d.bool(forKey: K.layoutsHover) }
     static var hoverDelay: TimeInterval { d.double(forKey: K.hoverDelay) }
     static var dragSnap: Bool { d.bool(forKey: K.dragSnap) }
-    static var animate: Bool { d.bool(forKey: K.animate) }
     static var switcher: Bool { d.bool(forKey: K.switcher) }
     static var allSpaces: Bool { d.bool(forKey: K.allSpaces) }
     static var showDelay: TimeInterval { d.double(forKey: K.showDelay) }
