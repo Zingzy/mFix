@@ -164,7 +164,7 @@ Thumbnails refresh three times a second, and only while a panel is open. When no
   <img src="docs/images/dock-light.png" alt="Window cards above a Dock icon, one for each of the app's windows" width="560">
 </picture>
 
-- Hover a Dock icon and its windows appear as cards above it after 250 ms. Click a card to go to that window, on any Space. Click its X to close it. Once one preview is open, moving to the next icon switches right away.
+- Hover a Dock icon and its windows appear as cards above it at once. Click a card to go to that window, on any Space. Click its X to close it. Once one preview is open, moving to the next icon switches right away.
 - The cards cover the Dock's name tooltip. That's as close as anyone has come to turning it off.
 - Click the icon of the app you're already in and it minimizes, the way a taskbar button does. With several windows, each click steps to the next one.
 - Works with the Dock at the bottom, left or right.

@@ -41,7 +41,7 @@ enum Settings {
     static let finderKeys = Setting(key: "finder.keys", initial: true)
     static let dockPreviews = Setting(key: "dock.previews", initial: true)
     static let dockClicks = Setting(key: "dock.clicks", initial: true)
-    static let dockDelay = Setting(key: "dock.delay", initial: 0.25)
+    static let dockDelay = Setting(key: "dock.delay", initial: 0.0)
     static let snapGroups = Setting(key: "snap.groups", initial: true)
     static let liveThumbnails = Setting(key: "thumbnails.live", initial: true)
     static let terminal = Setting(key: "finder.terminal", initial: "com.mitchellh.ghostty")
