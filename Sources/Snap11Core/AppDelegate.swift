@@ -113,11 +113,6 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
                 hk.register(Int(code), win) { MainActor.assumeIsolated { DockApps.activate(n + 1) } }
             }
         }
-        // Win+I opens the system's Settings on Windows.
-        hk.register(Int(Key.i), win) {
-            NSWorkspace.shared.openApplication(at: URL(fileURLWithPath: "/System/Applications/System Settings.app"),
-                                               configuration: NSWorkspace.OpenConfiguration())
-        }
         // Ctrl+Shift+Esc opens Task Manager on Windows; Cmd stands in for Ctrl.
         hk.register(Int(Key.escape), cmdKey | shiftKey) {
             NSWorkspace.shared.openApplication(at: URL(fileURLWithPath: "/System/Applications/Utilities/Activity Monitor.app"),
