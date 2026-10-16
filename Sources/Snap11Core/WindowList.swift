@@ -7,35 +7,19 @@ enum WindowList {
     /// The topmost ordinary window of another app under `p` (AX coordinates), skipping
     /// menus, panels, the menu bar and invisible windows above it.
     static func windowAt(_ p: CGPoint) -> (id: CGWindowID, pid: pid_t, bounds: CGRect)? {
-        let own = ProcessInfo.processInfo.processIdentifier
-        let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
-            as? [[String: Any]] ?? []
-        for w in info {
-            guard let b = w[kCGWindowBounds as String] as? NSDictionary,
-                  let bounds = CGRect(dictionaryRepresentation: b), bounds.contains(p) else { continue }
-            let layer = w[kCGWindowLayer as String] as? Int ?? 0
-            let alpha = w[kCGWindowAlpha as String] as? Double ?? 1
-            if layer != 0 || alpha == 0 { continue }
-            guard let id = w[kCGWindowNumber as String] as? CGWindowID,
-                  let pid = w[kCGWindowOwnerPID as String] as? pid_t, pid != own else { return nil }
-            return (id, pid, bounds)
-        }
-        return nil
+        guard let w = WindowInfo.onScreen.first(where: { $0.bounds.contains(p) && $0.layer == 0 && $0.alpha != 0 }),
+              w.pid != ProcessInfo.processInfo.processIdentifier else { return nil }
+        return (w.id, w.pid, w.bounds)
     }
 
     /// `only`: just this app's windows, which skips asking every other app.
     static func currentSpace(excluding: Set<CGWindowID> = [], only: pid_t? = nil) -> [AXWindow] {
         let ownPID = ProcessInfo.processInfo.processIdentifier
-        let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
-            as? [[String: Any]] ?? []
         var zOrder: [CGWindowID] = []
         var pids: [pid_t] = []
-        for w in info {
-            guard (w[kCGWindowLayer as String] as? Int) == 0,
-                  let id = w[kCGWindowNumber as String] as? CGWindowID,
-                  let pid = w[kCGWindowOwnerPID as String] as? pid_t, pid != ownPID else { continue }
-            zOrder.append(id)
-            if !pids.contains(pid) { pids.append(pid) }
+        for w in WindowInfo.onScreen where w.layer == 0 && w.pid != ownPID {
+            zOrder.append(w.id)
+            if !pids.contains(w.pid) { pids.append(w.pid) }
         }
 
         let apps = NSWorkspace.shared.runningApplications.filter {
@@ -81,7 +65,6 @@ enum WindowList {
         let known = Set(here.map(\.id))
         let own = ProcessInfo.processInfo.processIdentifier
         let regular = Set(NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular }.map(\.processIdentifier))
-        let info = CGWindowListCopyWindowInfo([.optionAll, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
         var elsewhere: [AXWindow] = []
         // AX lists only this Space's windows, but an app's main and focused window come back
         // from any Space. With that element the focus can raise it, which is what makes macOS
@@ -102,19 +85,14 @@ enum WindowList {
             }
             return reachable[pid]?[id]
         }
-        for w in info {
-            guard (w[kCGWindowLayer as String] as? Int) == 0,
-                  let id = w[kCGWindowNumber as String] as? CGWindowID, !known.contains(id),
-                  let pid = w[kCGWindowOwnerPID as String] as? pid_t, pid != own, regular.contains(pid),
-                  only == nil || only == pid,
-                  (w[kCGWindowAlpha as String] as? Double ?? 0) > 0,
-                  let b = w[kCGWindowBounds as String] as? NSDictionary,
-                  let frame = CGRect(dictionaryRepresentation: b), frame.width >= 100, frame.height >= 100,
-                  !SkyLight.spaces(for: id).isEmpty, SkyLight.isOrderedIn(id) else { continue }
-            if let e = element(pid: pid, id: id) ?? RemoteWindows.shared.element(for: id) {
-                elsewhere.append(AXWindow(element: e, pid: pid))
+        for w in WindowInfo.list([.optionAll, .excludeDesktopElements]) {
+            guard w.layer == 0, !known.contains(w.id), w.pid != own, regular.contains(w.pid), only == nil || only == w.pid,
+                  w.alpha > 0, w.bounds.width >= 100, w.bounds.height >= 100,
+                  !SkyLight.spaces(for: w.id).isEmpty, SkyLight.isOrderedIn(w.id) else { continue }
+            if let e = element(pid: w.pid, id: w.id) ?? RemoteWindows.shared.element(for: w.id) {
+                elsewhere.append(AXWindow(element: e, pid: w.pid))
             } else {
-                elsewhere.append(AXWindow(offSpace: id, pid: pid, title: w[kCGWindowName as String] as? String ?? "", frame: frame))
+                elsewhere.append(AXWindow(offSpace: w.id, pid: w.pid, title: w.name ?? "", frame: w.bounds))
             }
         }
         let unreached = Dictionary(grouping: elsewhere.filter { !$0.hasElement }, by: \.pid)
@@ -126,5 +104,34 @@ enum WindowList {
             .sorted { history.stamp($0.id)! > history.stamp($1.id)! }
         let rest = (visibleHere + elsewhere).filter { history.stamp($0.id) == nil }
         return stamped + rest + tail
+    }
+}
+
+/// One window as WindowServer lists it, front to back; bounds in AX coordinates.
+struct WindowInfo {
+    let id: CGWindowID
+    let pid: pid_t
+    let layer: Int
+    let alpha: Double
+    let bounds: CGRect
+    let name: String?
+    let owner: String?
+
+    static var onScreen: [WindowInfo] { list([.optionOnScreenOnly, .excludeDesktopElements]) }
+
+    static func list(_ options: CGWindowListOption, relativeTo window: CGWindowID = kCGNullWindowID) -> [WindowInfo] {
+        (CGWindowListCopyWindowInfo(options, window) as? [[String: Any]] ?? []).compactMap(WindowInfo.init)
+    }
+
+    init?(_ row: [String: Any]) {
+        guard let id = row[kCGWindowNumber as String] as? CGWindowID, let pid = row[kCGWindowOwnerPID as String] as? pid_t,
+              let b = row[kCGWindowBounds as String] as? NSDictionary, let bounds = CGRect(dictionaryRepresentation: b) else { return nil }
+        self.id = id
+        self.pid = pid
+        self.bounds = bounds
+        layer = row[kCGWindowLayer as String] as? Int ?? 0
+        alpha = row[kCGWindowAlpha as String] as? Double ?? 1
+        name = row[kCGWindowName as String] as? String
+        owner = row[kCGWindowOwnerName as String] as? String
     }
 }

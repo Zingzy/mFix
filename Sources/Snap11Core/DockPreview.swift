@@ -5,12 +5,11 @@ import AppKit
 /// icon of the app already in front minimizes its window, or steps to the next one when it
 /// has several. The Dock reports the hovered icon itself, as its list's selected child.
 @MainActor
-final class DockPreview {
+final class DockPreview: Feature {
     static let shared = DockPreview()
 
-
-    private let panel = OverlayPanel(takesKeyboard: false)
-    private var observer: AXObserver?
+    private let panel = OverlayPanel()
+    private var watcher: AXWatcher?
     private var list: AXUIElement?
     private var dockPID: pid_t = 0
     private var health: Timer?
@@ -26,15 +25,11 @@ final class DockPreview {
 
     func start() {
         subscribe()
-        health = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.checkHealth() }
-        }
-        let tap = ListenTap([.leftMouseDown, .leftMouseUp]) { [weak self] type, event in
+        health = Timer.onMain(after: 5, repeats: true) { [weak self] in self?.checkHealth() }
+        clickTap = ListenTap([.leftMouseDown, .leftMouseUp]) { [weak self] type, event in
             let p = event.location
             MainActor.assumeIsolated { self?.click(type == .leftMouseDown, at: p) }
         }
-        tap.start()
-        clickTap = tap
     }
 
     // MARK: Following the Dock
@@ -46,14 +41,10 @@ final class DockPreview {
         AXUIElementSetMessagingTimeout(app, 0.2)
         guard let found = ((app.attr(kAXChildrenAttribute) as [AXUIElement]?) ?? [])
             .first(where: { ($0.attr(kAXRoleAttribute) as String?) == kAXListRole }) else { return }
-        var obs: AXObserver?
         if Hotkeys.debug { NSLog("Snap11: dock list found, subscribing") }
-        guard AXObserverCreate(dockPID, { _, _, _, _ in
-            DispatchQueue.main.async { MainActor.assumeIsolated { DockPreview.shared.selectionChanged() } }
-        }, &obs) == .success, let obs else { return }
-        AXObserverAddNotification(obs, found, kAXSelectedChildrenChangedNotification as CFString, nil)
-        CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(obs), .commonModes)
-        observer = obs
+        guard let watcher = AXWatcher(pid: dockPID, { _, _ in onMain { DockPreview.shared.selectionChanged() } }) else { return }
+        watcher.watch(found, [kAXSelectedChildrenChangedNotification])
+        self.watcher = watcher
         list = found
     }
 
@@ -63,31 +54,28 @@ final class DockPreview {
         let pid = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock").first?.processIdentifier
         let alive = list.map { (($0.attr(kAXRoleAttribute) as String?) != nil) } ?? false
         if pid != dockPID || !alive {
-            observer = nil
+            watcher = nil
             list = nil
             subscribe()
         }
     }
 
     private func selectionChanged() {
-        guard Settings.dockPreviews, let list else { return }
+        guard Settings.dockPreviews.value, let list else { return }
         let selected = (list.attr(kAXSelectedChildrenAttribute) as [AXUIElement]?)?.first
         guard let item = selected, (item.attr(kAXSubroleAttribute) as String?) == "AXApplicationDockItem",
-              let url: URL = item.attr(kAXURLAttribute),
-              let pos = item.point(kAXPositionAttribute), let size = item.size(kAXSizeAttribute) else {
+              let url: URL = item.attr(kAXURLAttribute), let frame = item.frame else {
             hovered = nil
             showTimer?.invalidate()
             scheduleHide()
             return
         }
-        hovered = (CGRect(origin: pos, size: size), url)
+        hovered = (frame, url)
         if Hotkeys.debug { NSLog("Snap11: dock hover %@", url.lastPathComponent) }
         if shownFor == url { return }
         showTimer?.invalidate()
-        let wait = panel.isVisible ? 0 : Settings.dockDelay
-        showTimer = Timer.scheduledTimer(withTimeInterval: wait, repeats: false) { [weak self] _ in
-            MainActor.assumeIsolated { self?.show() }
-        }
+        let wait = panel.isVisible ? 0 : Settings.dockDelay.value
+        showTimer = Timer.onMain(after: wait) { [weak self] in self?.show() }
     }
 
     // MARK: Showing
@@ -108,10 +96,7 @@ final class DockPreview {
                                 minHeight: 90, maxHeight: 160, strip: 32, gap: CGSize(width: 10, height: 10))
         let size = CGSize(width: flow.size.width + pad * 2, height: flow.size.height + pad * 2)
 
-        let root = NSView(frame: NSRect(origin: .zero, size: size))
-        let bg = acrylicView(radius: 8)
-        bg.frame = root.bounds
-        root.addSubview(bg)
+        let root = acrylicRoot(size: size)
         let content = FlippedView(frame: root.bounds)
         cards = windows.enumerated().map { i, w in
             let card = WindowCard(window: w, stripHeight: 32, fontSize: 12)
@@ -123,9 +108,7 @@ final class DockPreview {
             }
             card.onClose = { [weak self] in
                 w.close()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    MainActor.assumeIsolated { self?.shownFor = nil; self?.show() }
-                }
+                onMain(after: 0.3) { self?.shownFor = nil; self?.show() }
             }
             content.addSubview(card)
             return card
@@ -154,25 +137,20 @@ final class DockPreview {
         scheduleHide()
 
         let g = generation
-        let onImage: (CGWindowID, CGImage) -> Void = { [weak self] id, image in
+        live.show(windows, points: max(flow.frames.first?.width ?? 200, 200)) { [weak self] id, image in
             guard let self, self.generation == g else { return }
             self.cards.first(where: { $0.target.id == id })?.setThumbnail(image)
         }
-        let side = max(flow.frames.first?.width ?? 200, 200)
-        Thumbnails.shared.capture(windows, points: side, onImage: onImage)
-        live.start(windows, points: side, onImage: onImage)
     }
 
     private func scheduleHide() {
         guard panel.isVisible, hideTimer == nil else { return }
-        hideTimer = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self else { return }
-                let p = NSEvent.mouseLocation
-                let overPanel = self.panel.frame.insetBy(dx: -6, dy: -6).contains(p)
-                let overIcon = self.hovered.map { Geo.flip($0.frame).insetBy(dx: -8, dy: -8).contains(p) } ?? false
-                if !overPanel && !overIcon { self.hide() }
-            }
+        hideTimer = Timer.onMain(after: 0.15, repeats: true) { [weak self] in
+            guard let self else { return }
+            let p = NSEvent.mouseLocation
+            let overPanel = self.panel.frame.insetBy(dx: -6, dy: -6).contains(p)
+            let overIcon = self.hovered.map { Geo.flip($0.frame).insetBy(dx: -8, dy: -8).contains(p) } ?? false
+            if !overPanel && !overIcon { self.hide() }
         }
     }
 
@@ -190,7 +168,7 @@ final class DockPreview {
     // MARK: Clicking the icon
 
     private func click(_ isDown: Bool, at p: CGPoint) {
-        guard Settings.dockClicks else { return }
+        guard Settings.dockClicks.value else { return }
         if isDown {
             down = nil
             guard let (icon, url) = hovered, icon.insetBy(dx: -4, dy: -4).contains(p) else { return }
@@ -202,16 +180,14 @@ final class DockPreview {
         guard let d = down, hypot(p.x - d.at.x, p.y - d.at.y) < 6, d.wasFront, !DragDrop.shared.isDragging else { down = nil; return }
         down = nil
         // After the Dock has handled its own click.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            MainActor.assumeIsolated {
-                guard let app = DockItems.Item(frame: .zero, url: d.url, title: "").runningApp else { return }
-                let windows = WindowList.currentSpace().filter { $0.pid == app.processIdentifier && !$0.isMinimized }
-                if windows.count == 1 {
-                    windows[0].minimize()
-                } else if let next = WindowCycle.next(of: windows, pid: app.processIdentifier) {
-                    next.focus()
-                    FocusHistory.shared.touch(next.id)
-                }
+        onMain(after: 0.15) {
+            guard let app = DockItems.Item(frame: .zero, url: d.url, title: "").runningApp else { return }
+            let windows = WindowList.currentSpace().filter { $0.pid == app.processIdentifier && !$0.isMinimized }
+            if windows.count == 1 {
+                windows[0].minimize()
+            } else if let next = WindowCycle.next(of: windows, pid: app.processIdentifier) {
+                next.focus()
+                FocusHistory.shared.touch(next.id)
             }
         }
     }

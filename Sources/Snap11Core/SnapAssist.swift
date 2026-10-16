@@ -8,14 +8,9 @@ enum Wallpaper {
 
     static func image(for screen: NSScreen) -> CGImage? {
         if let c = cache[screen.displayID] { return c }
-        let frame = Geo.flip(screen.frame)
         let desktopLevel = Int(CGWindowLevelForKey(.desktopWindow))
-        let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] ?? []
-        for w in info where (w[kCGWindowLayer as String] as? Int) == desktopLevel {
-            guard let id = w[kCGWindowNumber as String] as? CGWindowID,
-                  let b = w[kCGWindowBounds as String] as? NSDictionary,
-                  let bounds = CGRect(dictionaryRepresentation: b), bounds.isClose(to: frame, tolerance: 2),
-                  let image = SkyLight.captureWindow(id) else { continue }
+        for w in WindowInfo.list(.optionOnScreenOnly) where w.layer == desktopLevel {
+            guard w.bounds.isClose(to: screen.axFrame, tolerance: 2), let image = SkyLight.captureWindow(w.id) else { continue }
             cache[screen.displayID] = image
             return image
         }
@@ -33,7 +28,7 @@ enum Wallpaper {
 /// Snap Assist: after a window snaps, each empty zone in turn shows cards of the other
 /// windows on this Space; picking one snaps it there. Esc or a click elsewhere stops.
 @MainActor
-final class SnapAssist {
+final class SnapAssist: Feature {
     static let shared = SnapAssist()
 
     let panel = OverlayPanel(takesKeyboard: true)
@@ -53,6 +48,11 @@ final class SnapAssist {
     private let live = LiveThumbnails()
     private(set) var isOpen = false
 
+    /// Snap Assist waits for the chord's modifiers to go up, so holding them and pressing
+    /// arrows steers the window first, as on Windows.
+    var pending: (AXWindow, Zone, NSScreen)?
+    private var modifierTap: ListenTap?
+
     private init() {
         content.wantsLayer = true
         panel.onKey = { [weak self] e in self?.key(e) ?? false }
@@ -61,8 +61,22 @@ final class SnapAssist {
         }
     }
 
+    func start() {
+        modifierTap = ListenTap([.flagsChanged]) { [weak self] _, event in
+            let flags = event.flags
+            MainActor.assumeIsolated { self?.modifiersChanged(flags) }
+        }
+    }
+
+    private func modifiersChanged(_ flags: CGEventFlags) {
+        if Hotkeys.debug { NSLog("Snap11: flags %llx pending=%d", flags.rawValue, pending == nil ? 0 : 1) }
+        guard !flags.contains(.maskCommand) || !flags.contains(.maskAlternate), let (w, z, s) = pending else { return }
+        pending = nil
+        begin(after: w, zone: z, on: s)
+    }
+
     func begin(after window: AXWindow, zone snapped: Zone, on screen: NSScreen, layout: Layout? = nil) {
-        guard Settings.snapAssist else { return }
+        guard Settings.snapAssist.value else { return }
         if isOpen { end(focusLast: false) }
         let zones = SnapEngine.shared.emptyZones(after: snapped, layout: layout, on: screen, ignoring: [window.id])
         if Hotkeys.debug { NSLog("Snap11: assist begins after %u (%@) at %@, zones %@", window.id, window.title, "\(snapped)", "\(zones)") }
@@ -107,7 +121,7 @@ final class SnapAssist {
         let wall = CALayer()
         wall.contents = Wallpaper.image(for: screen)
         wall.contentsGravity = .resizeAspectFill
-        let sf = Geo.flip(screen.frame)
+        let sf = screen.axFrame
         wall.frame = CGRect(x: sf.minX - axFrame.minX, y: sf.minY - axFrame.minY, width: sf.width, height: sf.height)
         root.layer?.addSublayer(wall)
 
@@ -157,13 +171,10 @@ final class SnapAssist {
         panel.show(frame: frame)
 
         let g = generation
-        let onImage: (CGWindowID, CGImage) -> Void = { [weak self] id, image in
+        live.show(candidates, points: max(flow.frames.first?.width ?? 300, flow.frames.first?.height ?? 300)) { [weak self] id, image in
             guard let self, self.generation == g else { return }
             self.cards.first(where: { $0.target.id == id })?.setThumbnail(image)
         }
-        let side = max(flow.frames.first?.width ?? 300, flow.frames.first?.height ?? 300)
-        Thumbnails.shared.capture(candidates, points: side, onImage: onImage)
-        live.start(candidates, points: side, onImage: onImage)
     }
 
     private func updateRing() {
@@ -182,7 +193,7 @@ final class SnapAssist {
         if Hotkeys.debug { NSLog("Snap11: assist pick %u (%@) into %@, queue %d", window.id, window.title, "\(zone)", queue.count) }
         if window.isMinimized { window.unminimize() }
         SnapEngine.shared.place(window, zone: zone, on: screen)
-        if Settings.snapGroups, let anchor { SnapGroups.shared.join([window], with: anchor, on: screen) }
+        if Settings.snapGroups.value, let anchor { SnapGroups.shared.join([window], with: anchor, on: screen) }
         placed.insert(window.id)
         lastPicked = window
         window.focus()

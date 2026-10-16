@@ -1,35 +1,13 @@
 import AppKit
-
-/// A blurred, tinted panel background with smooth corners. A 9-slice mask instead of a
-/// layer corner radius, which aliases on NSVisualEffectView.
-@MainActor
-func acrylicView(radius: CGFloat) -> NSVisualEffectView {
-    let v = NSVisualEffectView()
-    v.material = .hudWindow
-    v.blendingMode = .behindWindow
-    v.state = .active
-    v.appearance = Theme.appearance
-    let edge = radius * 2 + 1
-    let mask = NSImage(size: NSSize(width: edge, height: edge), flipped: false) { rect in
-        NSColor.black.setFill()
-        NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
-        return true
-    }
-    mask.capInsets = NSEdgeInsets(top: radius, left: radius, bottom: radius, right: radius)
-    mask.resizingMode = .stretch
-    v.maskImage = mask
-    return v
-}
+import Carbon.HIToolbox
 
 /// The Windows 11 Alt+Tab switcher on Cmd+Tab: one centred acrylic panel of window cards in
 /// most-recently-used order. Holding Cmd keeps it open, releasing Cmd switches.
 @MainActor
-final class Switcher {
+final class Switcher: Feature {
     static let shared = Switcher()
 
-
     let panel = OverlayPanel(takesKeyboard: true)
-    private var background: NSVisualEffectView?
     private let content = FlippedView()
     private let ring = SelectionRing()
     private let scroll: NSScrollView = {
@@ -55,6 +33,7 @@ final class Switcher {
     private var dragHoverIndex: Int?
     private var generation = 0
     private let live = LiveThumbnails()
+    private var modifierTap: ListenTap?
     private(set) var isOpen = false
 
     private init() {
@@ -66,6 +45,22 @@ final class Switcher {
         }
     }
 
+    func start() {
+        modifierTap = ListenTap([.flagsChanged]) { [weak self] _, event in
+            let released = !event.flags.contains(.maskCommand)
+            MainActor.assumeIsolated { if released { self?.modifiersReleased() } }
+        }
+    }
+
+    func hotkeys(win: Int) -> [Hotkey] {
+        guard Settings.switcher.value else { return [] }
+        return [
+            Hotkey(Key.tab, cmdKey, repeats: true, replaces: [SystemShortcuts.cmdTab]) { self.step(backward: false) },
+            Hotkey(Key.tab, cmdKey | shiftKey, repeats: true, replaces: [SystemShortcuts.cmdShiftTab]) { self.step(backward: true) },
+            Hotkey(Key.tab, cmdKey | controlKey, repeats: true) { self.step(backward: false, sticky: true) },
+        ]
+    }
+
     // MARK: Opening and stepping
 
     func step(backward: Bool, sticky: Bool = false) {
@@ -73,7 +68,7 @@ final class Switcher {
             move(backward ? -1 : 1)
             return
         }
-        windows = collapseGroups(Settings.allSpaces ? WindowList.allSpaces() : WindowList.currentSpace())
+        windows = collapseGroups(Settings.allSpaces.value ? WindowList.allSpaces() : WindowList.currentSpace())
         if Hotkeys.debug { NSLog("Snap11: switcher windows %d", windows.count) }
         guard !windows.isEmpty else { return }
         isOpen = true
@@ -85,25 +80,23 @@ final class Switcher {
         self.sticky = sticky
         generation += 1
         selected = windows.count > 1 ? (backward ? windows.count - 1 : 1) : 0
-        if sticky || Settings.showDelay <= 0 {
+        if sticky || Settings.showDelay.value <= 0 {
             show()
         } else {
             let g = generation
-            showTimer = Timer.scheduledTimer(withTimeInterval: Settings.showDelay, repeats: false) { _ in
-                MainActor.assumeIsolated { if self.generation == g && self.isOpen { self.show() } }
-            }
+            showTimer = Timer.onMain(after: Settings.showDelay.value) { if self.generation == g && self.isOpen { self.show() } }
         }
     }
 
     /// Cmd went up: switch to the selection, unless the switcher was opened sticky.
-    func modifiersReleased() {
+    private func modifiersReleased() {
         guard isOpen, !sticky else { return }
         commit()
     }
 
     private func collapseGroups(_ list: [AXWindow]) -> [AXWindow] {
         groupOf = [:]
-        guard Settings.snapGroups else { return list }
+        guard Settings.snapGroups.value else { return list }
         let present = Set(list.filter { !$0.isMinimized }.map(\.id))
         var seen: [ObjectIdentifier] = []
         var out: [AXWindow] = []
@@ -121,8 +114,7 @@ final class Switcher {
     }
 
     private func screenAspect(_ g: SnapGroups.Group) -> CGFloat {
-        let s = NSScreen.screens.first { $0.displayID == g.screenID } ?? NSScreen.screens[0]
-        return s.frame.width / s.frame.height
+        g.screen.frame.width / g.screen.frame.height
     }
 
     private func move(_ delta: Int) {
@@ -134,7 +126,7 @@ final class Switcher {
     // MARK: Building the panel
 
     func show() {
-        let screen = Geo.screen(at: Geo.flip(NSEvent.mouseLocation)) ?? NSScreen.main ?? NSScreen.screens[0]
+        let screen = Geo.screen(at: Geo.pointer) ?? NSScreen.main ?? NSScreen.screens[0]
         let sf = screen.frame
         let pad: CGFloat = 56
         let box = CGSize(width: sf.width * 0.92 - pad * 2, height: sf.height * 0.9 - pad * 2)
@@ -168,14 +160,9 @@ final class Switcher {
         let size = CGSize(width: full.width, height: min(full.height, sf.height * 0.9))
         let frame = NSRect(x: sf.midX - size.width / 2, y: sf.midY - size.height / 2, width: size.width, height: size.height)
 
-        background?.removeFromSuperview()
-        let bg = acrylicView(radius: 8)
-        bg.frame = NSRect(origin: .zero, size: size)
-        background = bg
-        let root = NSView(frame: bg.frame)
-        root.addSubview(bg)
+        let root = acrylicRoot(size: size)
         content.frame = NSRect(origin: .zero, size: full)
-        scroll.frame = bg.frame
+        scroll.frame = root.bounds
         scroll.documentView = content
         scroll.contentView.scroll(to: .zero)
         root.addSubview(scroll)
@@ -196,17 +183,15 @@ final class Switcher {
                 self.cards.first(where: { $0.target.id == id })?.setThumbnail(image)
             }
         }
-        let side = max(flow.frames.first?.width ?? 300, flow.frames.first?.height ?? 300)
-        Thumbnails.shared.capture(everyone, points: side, onImage: onImage)
-        live.start(everyone, points: side, onImage: onImage)
+        live.show(everyone, points: max(flow.frames.first?.width ?? 300, flow.frames.first?.height ?? 300), onImage: onImage)
     }
 
     /// The group card's picture: the screen's wallpaper with each member's thumbnail where
     /// the member sits, like Windows' snap group thumbnails.
     private func composeGroup(_ lead: CGWindowID, _ g: SnapGroups.Group) {
         guard let card = cards.first(where: { $0.target.id == lead }) else { return }
-        let screen = NSScreen.screens.first { $0.displayID == g.screenID } ?? NSScreen.screens[0]
-        let sf = Geo.flip(screen.frame)
+        let screen = g.screen
+        let sf = screen.axFrame
         let w = 640, h = Int(640 / (sf.width / sf.height))
         guard let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0,
                                   space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
@@ -250,11 +235,9 @@ final class Switcher {
         selected = hit
         updateRing()
         let g = generation
-        dragHoverTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: false) { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self, self.generation == g, self.dragHoverIndex == hit else { return }
-                self.commit()
-            }
+        dragHoverTimer = Timer.onMain(after: 0.5) { [weak self] in
+            guard let self, self.generation == g, self.dragHoverIndex == hit else { return }
+            self.commit()
         }
     }
 

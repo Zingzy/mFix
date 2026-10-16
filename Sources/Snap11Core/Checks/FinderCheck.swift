@@ -17,7 +17,11 @@ public enum FinderCheck {
         let title = frontTitle
         guard front == "com.apple.finder", scratchTitles.contains(title) || focusedRole == "AXTextField" && scratchTitles.contains(lastScratchTitle) else {
             print("ABORT: front window is \"\(title)\" in \(front ?? "?"), not the scratch folder; no key sent")
-            for down in [true, false] { CGEvent(keyboardEventSource: nil, virtualKey: 53, keyDown: down)?.post(tap: .cghidEventTap) }
+            for down in [true, false] {
+                let e = CGEvent(keyboardEventSource: nil, virtualKey: 53, keyDown: down)
+                CheckGuard.mark(e)
+                e?.post(tap: .cghidEventTap)
+            }
             exit(2)
         }
         if scratchTitles.contains(title) { lastScratchTitle = title }
@@ -62,11 +66,7 @@ public enum FinderCheck {
 
     public static func run() {
         CheckGuard.begin()
-        var failures = 0
-        func check(_ ok: Bool, _ what: String) {
-            print(ok ? "ok  " : "FAIL", what)
-            if !ok { failures += 1 }
-        }
+        let check = Check("finder check")
         let fm = FileManager.default
         let root = URL(fileURLWithPath: "/tmp/snap11-finder-check")
         try? fm.removeItem(at: root)
@@ -79,8 +79,7 @@ public enum FinderCheck {
                 AXUIElementPerformAction(close, kAXPressAction as CFString)
             }
             try? fm.removeItem(at: root)
-            print(failures == 0 ? "finder check passed" : "finder check: \(failures) failed")
-            exit(failures == 0 ? 0 : 1)
+            check.finish()
         }
 
         NSWorkspace.shared.open(root)

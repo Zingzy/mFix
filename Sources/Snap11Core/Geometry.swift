@@ -13,24 +13,38 @@ enum Geo {
         CGPoint(x: p.x, y: primaryHeight - p.y)
     }
 
+    static var pointer: CGPoint { flip(NSEvent.mouseLocation) }
+
     /// The screen's usable area (minus menu bar and Dock) in AX coordinates.
     static func workArea(_ screen: NSScreen) -> CGRect { flip(screen.visibleFrame) }
 
     static func screen(containing axRect: CGRect) -> NSScreen {
         let center = CGPoint(x: axRect.midX, y: axRect.midY)
-        if let s = NSScreen.screens.first(where: { flip($0.frame).contains(center) }) { return s }
+        if let s = NSScreen.screens.first(where: { $0.axFrame.contains(center) }) { return s }
         return NSScreen.screens.max(by: {
-            flip($0.frame).intersection(axRect).area < flip($1.frame).intersection(axRect).area
+            $0.axFrame.intersection(axRect).area < $1.axFrame.intersection(axRect).area
         }) ?? NSScreen.main ?? NSScreen.screens[0]
     }
 
     static func screen(at axPoint: CGPoint) -> NSScreen? {
-        NSScreen.screens.first(where: { flip($0.frame).contains(axPoint) })
+        NSScreen.screens.first(where: { $0.axFrame.contains(axPoint) })
+    }
+
+    static func backingScale(of axRect: CGRect) -> CGFloat {
+        NSScreen.screens.first { $0.axFrame.intersects(axRect) }?.backingScaleFactor ?? 2
     }
 
     /// Screens ordered left to right, for moving windows across monitors.
     static var screensLeftToRight: [NSScreen] {
         NSScreen.screens.sorted { $0.frame.minX < $1.frame.minX }
+    }
+}
+
+extension NSScreen {
+    var axFrame: CGRect { Geo.flip(frame) }
+
+    var displayID: CGDirectDisplayID {
+        (deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value ?? 0
     }
 }
 

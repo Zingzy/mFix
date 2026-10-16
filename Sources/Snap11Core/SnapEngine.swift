@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 
 /// Windows 11 keyboard snapping. A window is restored, maximized, minimized or arranged in a
 /// zone; one restore frame per window survives every trip through arranged and maximized.
@@ -33,11 +34,6 @@ final class SnapEngine {
             return (.arranged(k), screen)
         }
         return (.restored, screen)
-    }
-
-    func zoneFrameIfArranged(_ window: AXWindow) -> (Zone, NSScreen)? {
-        if case let (.arranged(z), s) = state(of: window) { return (z, s) }
-        return nil
     }
 
     // MARK: Actions
@@ -88,8 +84,6 @@ final class SnapEngine {
         lastMinimized = window
         window.minimize()
     }
-
-    func forget(_ window: AXWindow) { records[window.id] = nil }
 
     /// Windows Snap11 snapped on a screen, at the frames it last put them at. Cheap: no app
     /// is asked, so the divider can look on every pointer move.
@@ -225,28 +219,36 @@ final class SnapEngine {
 
     private func arrangedFrames(on screen: NSScreen, ignoring: Set<CGWindowID>) -> [CGRect] {
         let work = Geo.workArea(screen)
-        let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
-            as? [[String: Any]] ?? []
         var frames: [CGRect] = []
         let knownZones = [Zone.left, .right, .top, .bottom, .topLeft, .topRight, .bottomLeft, .bottomRight]
             + Layout.thirds.zones + Layout.twoThirds.zones + Layout.quarterHalfQuarter.zones
-        for w in info {
-            guard (w[kCGWindowLayer as String] as? Int) == 0,
-                  let id = w[kCGWindowNumber as String] as? CGWindowID, !ignoring.contains(id),
-                  let b = w[kCGWindowBounds as String] as? NSDictionary,
-                  let frame = CGRect(dictionaryRepresentation: b) else { continue }
-            if let r = records[id], r.lastSet.isClose(to: frame), r.zone != .full {
-                frames.append(frame)
-            } else if knownZones.contains(where: { $0.frame(in: work).isClose(to: frame) }) {
-                frames.append(frame)
+        for w in WindowInfo.onScreen where w.layer == 0 && !ignoring.contains(w.id) {
+            if let r = records[w.id], r.lastSet.isClose(to: w.bounds), r.zone != .full {
+                frames.append(w.bounds)
+            } else if knownZones.contains(where: { $0.frame(in: work).isClose(to: w.bounds) }) {
+                frames.append(w.bounds)
             }
         }
         return frames
     }
 }
 
-extension NSScreen {
-    var displayID: CGDirectDisplayID {
-        (deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value ?? 0
+extension SnapEngine: Feature {
+    func hotkeys(win: Int) -> [Hotkey] {
+        let arrows: [(Int64, Arrow)] = [(Key.left, .left), (Key.right, .right), (Key.up, .up), (Key.down, .down)]
+        return arrows.map { code, arrow in
+            Hotkey(code, win) {
+                SnapAssist.shared.end(focusLast: false)
+                LayoutFlyout.shared.close()
+                SnapAssist.shared.pending = self.handle(arrow)
+            }
+        } + [
+            Hotkey(Key.up, Hotkey.winAlt) { SnapAssist.shared.pending = self.snapVertical(top: true) },
+            Hotkey(Key.down, Hotkey.winAlt) { SnapAssist.shared.pending = self.snapVertical(top: false) },
+            Hotkey(Key.left, win | shiftKey) { self.moveToScreen(towardLeft: true) },
+            Hotkey(Key.right, win | shiftKey) { self.moveToScreen(towardLeft: false) },
+            Hotkey(Key.up, win | shiftKey) { self.stretchVertically() },
+            Hotkey(Key.down, win | shiftKey) { self.restoreFocused() },
+        ]
     }
 }

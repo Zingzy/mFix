@@ -15,7 +15,7 @@ enum Terminals {
     }
 
     static var chosen: String {
-        let pick = Settings.terminal
+        let pick = Settings.terminal.value
         return installed.contains { $0.bundleID == pick } ? pick : installed.first?.bundleID ?? "com.apple.Terminal"
     }
 

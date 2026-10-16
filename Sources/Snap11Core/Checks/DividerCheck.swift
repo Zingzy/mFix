@@ -6,26 +6,9 @@ import AppKit
 @MainActor
 public enum DividerCheck {
     public static func run() {
-        Settings.register()
-        let child = Process()
-        child.executableURL = URL(fileURLWithPath: CommandLine.arguments[0])
-        child.arguments = ["--test-windows", "4"]
-        try? child.run()
-        var failures = 0
-        func check(_ ok: Bool, _ what: String) {
-            print(ok ? "ok  " : "FAIL", what)
-            if !ok { failures += 1 }
-        }
-        defer {
-            child.terminate()
-            print(failures == 0 ? "divider check passed" : "divider check: \(failures) failed")
-            exit(failures == 0 ? 0 : 1)
-        }
-        var w: [AXWindow] = []
-        for _ in 0..<40 where w.count < 4 {
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-            w = AXWindow.windows(of: child.processIdentifier).filter(\.isStandard)
-        }
+        let check = Check("divider check")
+        defer { check.finish() }
+        let w = check.testWindows([["--test-windows", "4"]], count: 4, pump: true)
         guard w.count == 4 else { check(false, "four test windows appeared"); return }
         let screen = Geo.screen(containing: w[0].frame)
         let work = Geo.workArea(screen)
@@ -34,10 +17,10 @@ public enum DividerCheck {
         // Quarters as a group.
         for (win, zone) in zip(w, Layout.quarters.zones) { SnapEngine.shared.place(win, zone: zone, on: screen) }
         SnapGroups.shared.join(Array(w.dropFirst()), with: w[0], on: screen)
-        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+        Check.pump(0.5)
         let lower = (midY + 120).rounded()
         check(SnapGroups.shared.dragLine(at: CGPoint(x: work.minX + 200, y: midY), to: lower), "quarters: a handle on the horizontal line")
-        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+        Check.pump(0.4)
         let tops = w.filter { $0.frame.minY < midY - 50 }, bottoms = w.filter { $0.frame.minY > midY - 50 }
         check(tops.count == 2 && tops.allSatisfy { abs($0.frame.maxY - lower) <= 2 }
               && bottoms.count == 2 && bottoms.allSatisfy { abs($0.frame.minY - lower) <= 2 }, "quarters: windows above and below follow the line")
@@ -54,16 +37,16 @@ public enum DividerCheck {
         short.size.width -= 7
         left.setFrame(short)
         SnapEngine.shared.adopt(left)
-        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+        Check.pump(0.5)
         check(SnapGroups.shared.group(containing: left.id) == nil, "half and quarters: not a group")
         let right = (midX + 150).rounded()
         check(SnapGroups.shared.dragLine(at: CGPoint(x: midX - 3, y: work.minY + 300), to: right), "half and quarters: a handle in the 7 pt gap")
-        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+        Check.pump(0.4)
         check(abs(left.frame.maxX - right) <= 2 && abs(top.frame.minX - right) <= 2 && abs(bottom.frame.minX - right) <= 2,
               "half and quarters: the left window and both quarters meet at the new line (\(left.frame.maxX) \(top.frame.minX) \(bottom.frame.minX))")
         let down = (midY + 80).rounded()
         check(SnapGroups.shared.dragLine(at: CGPoint(x: right + 200, y: midY), to: down), "half and quarters: a handle between the two quarters")
-        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+        Check.pump(0.4)
         check(abs(top.frame.maxY - down) <= 2 && abs(bottom.frame.minY - down) <= 2 && abs(left.frame.maxY - work.maxY) <= 2,
               "half and quarters: the quarters meet at it and the left window keeps its height")
     }

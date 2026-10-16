@@ -17,11 +17,7 @@ final class Thumbnails {
     /// CGPreflightScreenCaptureAccess caches its first answer for the life of the process.
     static var permitted: Bool {
         let own = ProcessInfo.processInfo.processIdentifier
-        let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] ?? []
-        return info.contains {
-            ($0[kCGWindowOwnerPID as String] as? pid_t) != own && ($0[kCGWindowLayer as String] as? Int) == 0
-                && !(($0[kCGWindowName as String] as? String) ?? "").isEmpty
-        }
+        return WindowInfo.list(.optionOnScreenOnly).contains { $0.pid != own && $0.layer == 0 && !($0.name ?? "").isEmpty }
     }
 
     private func scWindows(for ids: [CGWindowID]) async -> [CGWindowID: SCWindow] {
@@ -58,8 +54,7 @@ final class Thumbnails {
                 let window = known[id]!
                 let config = SCScreenshotConfiguration()
                 // Sharp on this display's real pixel ratio, whatever the Displays scaling.
-                let backing = NSScreen.screens.first { Geo.flip($0.frame).intersects(window.frame) }?.backingScaleFactor ?? 2
-                let scale = min(1, points / max(window.frame.width, window.frame.height, 1)) * backing
+                let scale = min(1, points / max(window.frame.width, window.frame.height, 1)) * Geo.backingScale(of: window.frame)
                 config.width = max(1, Int(window.frame.width * scale))
                 config.height = max(1, Int(window.frame.height * scale))
                 config.showsCursor = false
@@ -68,14 +63,12 @@ final class Thumbnails {
                 pending += 1
                 SCScreenshotManager.captureScreenshot(contentFilter: filter, configuration: config) { output, _ in
                     let image = output?.sdrImage
-                    DispatchQueue.main.async {
-                        MainActor.assumeIsolated {
-                            if let image {
-                                Thumbnails.shared.cache[id] = image
-                                onImage(id, image)
-                            }
-                            finished()
+                    onMain {
+                        if let image {
+                            Thumbnails.shared.cache[id] = image
+                            onImage(id, image)
                         }
+                        finished()
                     }
                 }
             }

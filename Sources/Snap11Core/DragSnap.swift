@@ -32,10 +32,10 @@ func dragOutFrame(current: CGRect, restoreSize: CGSize, grab: CGPoint, grabbedFr
 /// monitors, shows the frosted preview while the pointer sits on an edge or corner, and
 /// snaps on release. Esc during the drag cancels.
 @MainActor
-final class DragSnap {
+final class DragSnap: Feature {
     static let shared = DragSnap()
 
-    private let preview = OverlayPanel(takesKeyboard: false)
+    private let preview = OverlayPanel(level: .normal, clickThrough: true)
     private var wid: CGWindowID = 0
     private var pid: pid_t = 0
     private var window: AXWindow?
@@ -47,9 +47,6 @@ final class DragSnap {
     private var zoneScreen: NSScreen?
 
     private init() {
-        preview.ignoresMouseEvents = true
-        preview.level = .normal
-        preview.animationBehavior = .none
         let glass = NSVisualEffectView()
         glass.material = .hudWindow
         glass.blendingMode = .behindWindow
@@ -67,7 +64,7 @@ final class DragSnap {
     private var tap: ListenTap?
 
     func start() {
-        let tap = ListenTap([.leftMouseDown, .leftMouseDragged, .leftMouseUp, .keyDown]) { [weak self] type, event in
+        tap = ListenTap([.leftMouseDown, .leftMouseDragged, .leftMouseUp, .keyDown]) { [weak self] type, event in
             let location = event.location
             let target = CGWindowID(clamping: event.getIntegerValueField(.mouseEventWindowUnderMousePointerThatCanHandleThisEvent))
             let key = event.getIntegerValueField(.keyboardEventKeycode)
@@ -84,17 +81,16 @@ final class DragSnap {
                 }
             }
         }
-        tap.start()
-        self.tap = tap
     }
 
     private func begin(at location: CGPoint, target: CGWindowID) {
         reset()
-        guard Settings.dragSnap else { return }
+        guard Settings.dragSnap.value else { return }
         var id = target
         if id == 0 { id = WindowList.windowAt(location)?.id ?? 0 }
         if Hotkeys.debug { NSLog("Snap11: drag mouseDown at %@ window %u", NSStringFromPoint(location), id) }
-        guard id != 0, let info = Self.info(id), info.pid != ProcessInfo.processInfo.processIdentifier, info.layer == 0 else { return }
+        guard id != 0, let info = WindowInfo.list(.optionIncludingWindow, relativeTo: id).first,
+              info.pid != ProcessInfo.processInfo.processIdentifier, info.layer == 0 else { return }
         wid = id
         pid = info.pid
         grabFrame = info.bounds
@@ -104,7 +100,7 @@ final class DragSnap {
     private func dragged(to cursor: CGPoint) {
         guard wid != 0, !cancelled else { return }
         if !moving {
-            guard let now = Self.info(wid)?.bounds else { return }
+            guard let now = WindowInfo.list(.optionIncludingWindow, relativeTo: wid).first?.bounds else { return }
             if Hotkeys.debug { NSLog("Snap11: drag event, window now %@ grabbed %@", NSStringFromRect(now), NSStringFromRect(grabFrame)) }
             if now.size != grabFrame.size {
                 wid = 0
@@ -128,9 +124,9 @@ final class DragSnap {
     }
 
     private func update(_ cursor: CGPoint) {
-        guard let screen = Geo.screen(at: cursor) ?? NSScreen.screens.first(where: { Geo.flip($0.frame).insetBy(dx: -1, dy: -1).contains(cursor) })
+        guard let screen = Geo.screen(at: cursor) ?? NSScreen.screens.first(where: { $0.axFrame.insetBy(dx: -1, dy: -1).contains(cursor) })
         else { hidePreview(); return }
-        let next = dragZone(cursor: cursor, screen: Geo.flip(screen.frame), screens: NSScreen.screens.map { Geo.flip($0.frame) })
+        let next = dragZone(cursor: cursor, screen: screen.axFrame, screens: NSScreen.screens.map(\.axFrame))
         guard next != zone || screen != zoneScreen else { return }
         zone = next
         zoneScreen = screen
@@ -145,11 +141,9 @@ final class DragSnap {
         guard let zone, let screen = zoneScreen else { return }
         hidePreview()
         // The app finishes its own drag after mouse-up; snap once it has let go of the window.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            MainActor.assumeIsolated {
-                SnapEngine.shared.place(window, zone: zone, on: screen)
-                if zone != .full { SnapAssist.shared.begin(after: window, zone: zone, on: screen) }
-            }
+        onMain(after: 0.05) {
+            SnapEngine.shared.place(window, zone: zone, on: screen)
+            if zone != .full { SnapAssist.shared.begin(after: window, zone: zone, on: screen) }
         }
     }
 
@@ -177,13 +171,5 @@ final class DragSnap {
         cancelled = false
         zone = nil
         zoneScreen = nil
-    }
-
-    private static func info(_ id: CGWindowID) -> (pid: pid_t, bounds: CGRect, layer: Int)? {
-        guard let list = CGWindowListCopyWindowInfo(.optionIncludingWindow, id) as? [[String: Any]],
-              let w = list.first, let pid = w[kCGWindowOwnerPID as String] as? pid_t,
-              let b = w[kCGWindowBounds as String] as? NSDictionary, let bounds = CGRect(dictionaryRepresentation: b)
-        else { return nil }
-        return (pid, bounds, w[kCGWindowLayer as String] as? Int ?? 0)
     }
 }

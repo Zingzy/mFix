@@ -9,7 +9,7 @@ final class FocusHistory {
 
     private var stamps: [CGWindowID: UInt64] = [:]
     private var clock: UInt64 = 0
-    private var observers: [pid_t: AXObserver] = [:]
+    private var watchers: [pid_t: AXWatcher] = [:]
 
     func start() {
         let center = NSWorkspace.shared.notificationCenter
@@ -20,7 +20,7 @@ final class FocusHistory {
         }
         center.addObserver(forName: NSWorkspace.didTerminateApplicationNotification, object: nil, queue: .main) { [weak self] note in
             guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
-            self?.observers[app.processIdentifier] = nil
+            self?.watchers[app.processIdentifier] = nil
         }
         for app in NSWorkspace.shared.runningApplications where app.activationPolicy == .regular { observe(app) }
         if let front = NSWorkspace.shared.frontmostApplication { touchFocused(of: front.processIdentifier) }
@@ -49,20 +49,13 @@ final class FocusHistory {
 
     private func observe(_ app: NSRunningApplication) {
         let pid = app.processIdentifier
-        guard observers[pid] == nil, pid != ProcessInfo.processInfo.processIdentifier else { return }
-        var observer: AXObserver?
-        let callback: AXObserverCallback = { _, element, _, _ in
-            var id: CGWindowID = 0
-            _AXUIElementGetWindow(element, &id)
-            FocusHistory.shared.touch(id)
-        }
-        guard AXObserverCreate(pid, callback, &observer) == .success, let observer else { return }
+        guard watchers[pid] == nil, pid != ProcessInfo.processInfo.processIdentifier,
+              let watcher = AXWatcher(pid: pid, mode: .defaultMode, { id, _ in FocusHistory.shared.touch(id) }) else { return }
         let appElement = AXUIElementCreateApplication(pid)
         AXUIElementSetMessagingTimeout(appElement, 0.25)
-        for name in [kAXFocusedWindowChangedNotification, kAXMainWindowChangedNotification] {
-            AXObserverAddNotification(observer, appElement, name as CFString, nil)
-        }
-        CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .defaultMode)
-        observers[pid] = observer
+        watcher.watch(appElement, [kAXFocusedWindowChangedNotification, kAXMainWindowChangedNotification])
+        watchers[pid] = watcher
     }
 }
+
+extension FocusHistory: Feature {}

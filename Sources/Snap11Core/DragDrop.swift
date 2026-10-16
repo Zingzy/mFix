@@ -7,15 +7,14 @@ import QuickLookThumbnailing
 /// switcher works mid-drag. A content drag is spotted by the drag pasteboard changing after
 /// a mouse-down; window moves and plain clicks never touch it.
 @MainActor
-final class DragDrop {
+final class DragDrop: Feature {
     static let shared = DragDrop()
-
 
     private var tap: ListenTap?
     private var downCount = 0
     private var buttonDown = false
     private(set) var isDragging = false
-    private let preview = OverlayPanel(takesKeyboard: false)
+    private let preview = OverlayPanel(level: .floating, clickThrough: true)
     private var previewSize: CGSize = .zero
     private var dockItems: [(frame: CGRect, url: URL)] = []
     private var dockRead = Date.distantPast
@@ -23,13 +22,10 @@ final class DragDrop {
     private var springURL: URL?
     private var generation = 0
 
-    private init() {
-        preview.ignoresMouseEvents = true
-        preview.level = .floating
-    }
+    private init() {}
 
     func start() {
-        let tap = ListenTap([.leftMouseDown, .leftMouseDragged, .leftMouseUp]) { [weak self] type, event in
+        tap = ListenTap([.leftMouseDown, .leftMouseDragged, .leftMouseUp]) { [weak self] type, event in
             let location = event.location
             MainActor.assumeIsolated {
                 guard let self else { return }
@@ -43,8 +39,6 @@ final class DragDrop {
                 }
             }
         }
-        tap.start()
-        self.tap = tap
     }
 
     private func dragged(to p: CGPoint) {
@@ -54,11 +48,11 @@ final class DragDrop {
             guard pb.changeCount != downCount, let content = DragContent(pb) else { return }
             isDragging = true
             generation += 1
-            if Settings.dragPreview { showPreview(content) }
+            if Settings.dragPreview.value { showPreview(content) }
             readDock(force: true)
         }
-        if Settings.dragPreview { movePreview(to: p) }
-        if Settings.dockSpring { spring(at: p) }
+        if Settings.dragPreview.value { movePreview(to: p) }
+        if Settings.dockSpring.value { spring(at: p) }
         Switcher.shared.dragMoved(to: p)
     }
 
@@ -89,11 +83,9 @@ final class DragDrop {
                                                            representationTypes: .thumbnail)
                 QLThumbnailGenerator.shared.generateBestRepresentation(for: request) { rep, _ in
                     guard let image = rep?.nsImage else { return }
-                    DispatchQueue.main.async {
-                        MainActor.assumeIsolated {
-                            guard self.generation == g else { return }
-                            view.setThumbnail(image, at: i)
-                        }
+                    onMain {
+                        guard self.generation == g else { return }
+                        view.setThumbnail(image, at: i)
                     }
                 }
             }
@@ -118,7 +110,7 @@ final class DragDrop {
     private func spring(at p: CGPoint) {
         if dockItems.isEmpty || !(dockItems.contains { $0.frame.insetBy(dx: 0, dy: -8).contains(p) }) {
             // An auto-hidden Dock only has real frames once it slides in.
-            if Geo.screen(at: p).map({ p.y > Geo.flip($0.frame).maxY - 90 }) ?? false { readDock() }
+            if Geo.screen(at: p).map({ p.y > $0.axFrame.maxY - 90 }) ?? false { readDock() }
         }
         let url = dockItems.first { $0.frame.contains(p) }?.url
         guard url != springURL else { return }
@@ -126,11 +118,9 @@ final class DragDrop {
         springTimer?.invalidate()
         springTimer = nil
         guard let url else { return }
-        springTimer = Timer.scheduledTimer(withTimeInterval: Settings.springDelay, repeats: false) { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self, self.isDragging, self.springURL == url else { return }
-                self.bringForward(appAt: url)
-            }
+        springTimer = Timer.onMain(after: Settings.springDelay.value) { [weak self] in
+            guard let self, self.isDragging, self.springURL == url else { return }
+            self.bringForward(appAt: url)
         }
     }
 

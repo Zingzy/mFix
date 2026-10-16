@@ -7,7 +7,7 @@ final class Hotkeys {
     static let shared = Hotkeys()
     static let debug = ProcessInfo.processInfo.environment["SNAP11_DEBUG"] != nil
 
-    private var actions: [UInt32: () -> Void] = [:]
+    private var actions: [UInt32: @MainActor () -> Void] = [:]
     private var repeating: Set<UInt32> = []
     private var refs: [EventHotKeyRef] = []
     private var nextID: UInt32 = 1
@@ -15,21 +15,19 @@ final class Hotkeys {
     private var repeatTimer: Timer?
     private var heldID: UInt32?
 
-    /// `repeats`: holding the chord fires it again at the system key-repeat delay and rate,
-    /// since Carbon delivers one press per physical press and no auto-repeat.
-    func register(_ keyCode: Int, _ modifiers: Int, repeats: Bool = false, _ action: @escaping () -> Void) {
+    func register(_ hotkey: Hotkey) {
         installHandler()
         var ref: EventHotKeyRef?
         let id = EventHotKeyID(signature: OSType(0x534e_3131), id: nextID)
-        guard RegisterEventHotKey(UInt32(keyCode), UInt32(modifiers), id, GetEventDispatcherTarget(), 0, &ref) == noErr,
+        guard RegisterEventHotKey(UInt32(hotkey.key), UInt32(hotkey.modifiers), id, GetEventDispatcherTarget(), 0, &ref) == noErr,
               let ref else {
-            NSLog("Snap11: hotkey %d/%d is taken", keyCode, modifiers)
+            NSLog("Snap11: hotkey %d/%d is taken", Int(hotkey.key), hotkey.modifiers)
             return
         }
-        if Hotkeys.debug { NSLog("Snap11: hotkey %u = key %d mods %d", nextID, keyCode, modifiers) }
+        if Hotkeys.debug { NSLog("Snap11: hotkey %u = key %d mods %d", nextID, Int(hotkey.key), hotkey.modifiers) }
         refs.append(ref)
-        actions[nextID] = action
-        if repeats { repeating.insert(nextID) }
+        actions[nextID] = hotkey.action
+        if hotkey.repeats { repeating.insert(nextID) }
         nextID += 1
     }
 
@@ -50,17 +48,22 @@ final class Hotkeys {
     private func pressed(_ id: UInt32) {
         if Hotkeys.debug { NSLog("Snap11: hotkey %u pressed", id) }
         stopRepeating()
-        actions[id]?()
+        fire(id)
         guard repeating.contains(id) else { return }
         heldID = id
         repeatTimer = Timer.scheduledTimer(withTimeInterval: NSEvent.keyRepeatDelay, repeats: false) { [weak self] _ in
             guard let self, self.heldID == id else { return }
-            self.actions[id]?()
+            self.fire(id)
             self.repeatTimer = Timer.scheduledTimer(withTimeInterval: NSEvent.keyRepeatInterval, repeats: true) { [weak self] _ in
                 guard let self, self.heldID == id else { return }
-                self.actions[id]?()
+                self.fire(id)
             }
         }
+    }
+
+    private func fire(_ id: UInt32) {
+        guard let action = actions[id] else { return }
+        MainActor.assumeIsolated { action() }
     }
 
     private func released(_ id: UInt32) {
@@ -86,25 +89,41 @@ final class Hotkeys {
     }
 }
 
+struct Hotkey {
+    /// Win+Alt: the third of Cmd, Option and Control on top of the Win chord.
+    static let winAlt = cmdKey | optionKey | controlKey
+
+    let key: Int64
+    let modifiers: Int
+    /// Holding the chord fires it again at the system key-repeat delay and rate, since Carbon
+    /// delivers one press per physical press and no auto-repeat.
+    let repeats: Bool
+    /// macOS's own shortcuts on the same chord, switched off while it is bound.
+    let replaces: [Int32]
+    let action: @MainActor () -> Void
+
+    init(_ key: Int64, _ modifiers: Int, repeats: Bool = false, replaces: [Int32] = [], _ action: @escaping @MainActor () -> Void) {
+        self.key = key
+        self.modifiers = modifiers
+        self.repeats = repeats
+        self.replaces = replaces
+        self.action = action
+    }
+}
+
 /// A listen-only session event tap: sees every event of the given types on its way through
 /// WindowServer, including the mouse drags WindowServer runs itself for title-bar moves,
 /// which never reach an app and so never reach an NSEvent global monitor.
 /// Listen-only on purpose: an active tap hangs all input if Accessibility is revoked.
 final class ListenTap {
     private var tap: CFMachPort?
-    private let types: [CGEventType]
     private let handler: (CGEventType, CGEvent) -> Void
 
     init(_ types: [CGEventType], handler: @escaping (CGEventType, CGEvent) -> Void) {
-        self.types = types
         self.handler = handler
-    }
-
-    @discardableResult
-    func start() -> Bool {
         let me = Unmanaged.passUnretained(self).toOpaque()
         let mask = types.reduce(CGEventMask(0)) { $0 | (1 << $1.rawValue) }
-        guard let tap = CGEvent.tapCreate(
+        tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap, place: .headInsertEventTap, options: .listenOnly,
             eventsOfInterest: mask,
             callback: { _, type, event, refcon in
@@ -117,11 +136,13 @@ final class ListenTap {
                 return Unmanaged.passUnretained(event)
             },
             userInfo: me
-        ) else { return false }
-        self.tap = tap
+        )
+        guard let tap else {
+            NSLog("Snap11: event tap failed; Accessibility trusted = %d", AXIsProcessTrusted() ? 1 : 0)
+            return
+        }
         CFRunLoopAddSource(CFRunLoopGetMain(), CFMachPortCreateRunLoopSource(nil, tap, 0), .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
-        return true
     }
 }
 

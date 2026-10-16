@@ -52,19 +52,17 @@ public enum RenderCheck {
             settingsHosts.append(host)
         }
         // Thumbnails arrive asynchronously; give them a moment before drawing.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-            MainActor.assumeIsolated {
-                write(Switcher.shared.panel, to: "\(dir)/switcher.png")
-                write(SnapAssist.shared.panel, to: "\(dir)/snap-assist.png")
-                write(LayoutFlyout.shared.panel, to: "\(dir)/flyout.png")
-                for (i, host) in settingsHosts.enumerated() {
-                    host.layoutSubtreeIfNeeded()
-                    guard let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { continue }
-                    host.cacheDisplay(in: host.bounds, to: rep)
-                    try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: "\(dir)/settings-\(i).png"))
-                }
-                NSApp.terminate(nil)
+        onMain(after: 2.5) {
+            write(Switcher.shared.panel, to: "\(dir)/switcher.png")
+            write(SnapAssist.shared.panel, to: "\(dir)/snap-assist.png")
+            write(LayoutFlyout.shared.panel, to: "\(dir)/flyout.png")
+            for (i, host) in settingsHosts.enumerated() {
+                host.layoutSubtreeIfNeeded()
+                guard let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { continue }
+                host.cacheDisplay(in: host.bounds, to: rep)
+                try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: "\(dir)/settings-\(i).png"))
             }
+            NSApp.terminate(nil)
         }
     }
 

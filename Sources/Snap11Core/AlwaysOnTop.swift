@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import ScreenCaptureKit
 
 /// PowerToys' Always on Top: Win+Ctrl+T pins the window in front, and again unpins it, with an
@@ -8,15 +9,15 @@ import ScreenCaptureKit
 /// panel of its own that does stay on top. Clicking the mirror brings the real window forward
 /// and the mirror goes; it streams only while it shows. Closing the window unpins it.
 @MainActor
-final class AlwaysOnTop {
+final class AlwaysOnTop: Feature {
     static let shared = AlwaysOnTop()
 
     @MainActor
     private final class Pin {
         let window: AXWindow
-        let border = OverlayPanel(takesKeyboard: false)
+        let border = OverlayPanel(level: NSWindow.Level(rawValue: NSWindow.Level.floating.rawValue + 1), clickThrough: true)
         let mirror = MirrorPanel()
-        var observer: AXObserver?
+        var watcher: AXWatcher?
         var stream: SCStream?
         var output: FrameSink?
         var starting = false
@@ -42,23 +43,21 @@ final class AlwaysOnTop {
             return
         }
         guard closeWatch == nil else { return }
-        closeWatch = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self else { return }
-                let gone = self.pins.filter { id, pin in
-                    (CGWindowListCopyWindowInfo(.optionIncludingWindow, id) as? [[String: Any]] ?? []).isEmpty
-                        || (!SkyLight.isOrderedIn(id) && !pin.window.isMinimized && !(pin.window.app?.isHidden ?? false))
-                }
-                for (id, pin) in gone {
-                    self.stopMirror(pin)
-                    pin.border.hide()
-                    self.pins[id] = nil
-                }
-                for pin in self.pins.values {
-                    if let t = pin.closing, Date().timeIntervalSince(t) > 1 {
-                        pin.closing = nil
-                        self.refresh(pin)
-                    }
+        closeWatch = Timer.onMain(after: 0.05, repeats: true) { [weak self] in
+            guard let self else { return }
+            let gone = self.pins.filter { id, pin in
+                WindowInfo.list(.optionIncludingWindow, relativeTo: id).isEmpty
+                    || (!SkyLight.isOrderedIn(id) && !pin.window.isMinimized && !(pin.window.app?.isHidden ?? false))
+            }
+            for (id, pin) in gone {
+                self.stopMirror(pin)
+                pin.border.hide()
+                self.pins[id] = nil
+            }
+            for pin in self.pins.values {
+                if let t = pin.closing, Date().timeIntervalSince(t) > 1 {
+                    pin.closing = nil
+                    self.refresh(pin)
                 }
             }
         }
@@ -70,8 +69,7 @@ final class AlwaysOnTop {
             let p = event.location
             for pin in pins.values {
                 guard let button: AXUIElement = pin.window.element?.attr(kAXCloseButtonAttribute),
-                      let o = button.point(kAXPositionAttribute), let s = button.size(kAXSizeAttribute),
-                      CGRect(origin: o, size: s).insetBy(dx: -2, dy: -2).contains(p) else { continue }
+                      button.frame?.insetBy(dx: -2, dy: -2).contains(p) == true else { continue }
                 closing(pin)
             }
         } else if event.getIntegerValueField(.keyboardEventKeycode) == Key.w,
@@ -88,11 +86,9 @@ final class AlwaysOnTop {
     }
 
     func start() {
-        let tap = ListenTap([.leftMouseUp, .keyDown]) { [weak self] type, event in
+        closeTap = ListenTap([.leftMouseUp, .keyDown]) { [weak self] type, event in
             MainActor.assumeIsolated { if self?.pins.isEmpty == false { self?.closeAsked(type, event) } }
         }
-        tap.start()
-        closeTap = tap
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.refreshAll() }
         }
@@ -102,6 +98,11 @@ final class AlwaysOnTop {
         FocusHistory.shared.onFocus = { [weak self] _ in
             MainActor.assumeIsolated { self?.refreshAll() }
         }
+    }
+
+    func hotkeys(win: Int) -> [Hotkey] {
+        // PowerToys' Always on Top is Win+Ctrl+T.
+        Settings.alwaysOnTop.value ? [Hotkey(Key.t, Hotkey.winAlt) { self.toggleFocused() }] : []
     }
 
     var pinnedIDs: Set<CGWindowID> { Set(pins.keys) }
@@ -122,8 +123,6 @@ final class AlwaysOnTop {
             return
         }
         let pin = Pin(window: w)
-        pin.border.ignoresMouseEvents = true
-        pin.border.level = NSWindow.Level(rawValue: NSWindow.Level.floating.rawValue + 1)
         let border = BorderView()
         border.radii = WindowCorners.radii(of: w.id, frameWidth: w.frame.width) ?? .fallback
         pin.border.contentView = border
@@ -182,7 +181,7 @@ final class AlwaysOnTop {
                       let scw = content.windows.first(where: { $0.windowID == pin.window.id }),
                       self.pins[pin.window.id] === pin else { return }
                 let config = SCStreamConfiguration()
-                let scale = NSScreen.screens.first { Geo.flip($0.frame).intersects(frame) }?.backingScaleFactor ?? 2
+                let scale = Geo.backingScale(of: frame)
                 config.width = Int(frame.width * scale)
                 config.height = Int(frame.height * scale)
                 config.minimumFrameInterval = CMTime(value: 1, timescale: 30)
@@ -213,19 +212,9 @@ final class AlwaysOnTop {
 
     private func follow(_ pin: Pin) {
         guard let element = pin.window.element else { return }
-        var obs: AXObserver?
-        guard AXObserverCreate(pin.window.pid, { _, element, notification, _ in
-            var id: CGWindowID = 0
-            _AXUIElementGetWindow(element, &id)
-            let name = notification as String
-            DispatchQueue.main.async { MainActor.assumeIsolated { AlwaysOnTop.shared.changed(id, name) } }
-        }, &obs) == .success, let obs else { return }
-        for n in [kAXMovedNotification, kAXResizedNotification, kAXUIElementDestroyedNotification,
-                  kAXWindowMiniaturizedNotification, kAXWindowDeminiaturizedNotification] {
-            AXObserverAddNotification(obs, element, n as CFString, nil)
-        }
-        CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(obs), .commonModes)
-        pin.observer = obs
+        pin.watcher = AXWatcher(pid: pin.window.pid) { id, name in onMain { AlwaysOnTop.shared.changed(id, name) } }
+        pin.watcher?.watch(element, [kAXMovedNotification, kAXResizedNotification, kAXUIElementDestroyedNotification,
+                                     kAXWindowMiniaturizedNotification, kAXWindowDeminiaturizedNotification])
     }
 
     private func changed(_ id: CGWindowID, _ notification: String) {

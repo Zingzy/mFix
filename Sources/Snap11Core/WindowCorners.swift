@@ -37,14 +37,4 @@ public enum WindowCorners {
         guard let tl = corner(1, 1), let tr = corner(-1, 1), let bl = corner(1, -1), let br = corner(-1, -1) else { return nil }
         return Radii(topLeft: tl, topRight: tr, bottomLeft: bl, bottomRight: br)
     }
-
-    /// `Snap11 --corners`: every window's measured radii, to check the measuring.
-    @MainActor
-    public static func report() {
-        for w in WindowList.allSpaces() {
-            let r = radii(of: w.id, frameWidth: w.frame.width)
-            print(w.app?.localizedName ?? "?", "| radii", r.map { "tl \($0.topLeft) tr \($0.topRight) bl \($0.bottomLeft) br \($0.bottomRight)" } ?? "unknown")
-        }
-        exit(0)
-    }
 }

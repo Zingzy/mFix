@@ -37,7 +37,8 @@ public enum LiveBench {
         }
     }
 
-    private static func measure(_ seconds: Double) -> (me: Double, ws: Double, replayd: Double) {
+    /// This process's CPU and that of WindowServer and replayd over `seconds`, in percent of one core.
+    static func measure(_ seconds: Double) -> (me: Double, ws: Double, replayd: Double) {
         let (me0, ws0, rp0) = (cpuSeconds(), cpuTime(of: "WindowServer"), cpuTime(of: "replayd"))
         RunLoop.current.run(until: Date().addingTimeInterval(seconds))
         let (me1, ws1, rp1) = (cpuSeconds(), cpuTime(of: "WindowServer"), cpuTime(of: "replayd"))
@@ -45,11 +46,9 @@ public enum LiveBench {
     }
 
     public static func run() {
-        Settings.register()
         let windows = WindowList.currentSpace()
         print("windows on this Space:", windows.count, windows.map { "\($0.id) \($0.app?.localizedName ?? "?")" })
-        let onScreen = Set((CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
-            as? [[String: Any]] ?? []).compactMap { $0[kCGWindowNumber as String] as? CGWindowID })
+        let onScreen = Set(WindowInfo.onScreen.map(\.id))
         print("of those on screen:", windows.filter { onScreen.contains($0.id) }.count)
         var once = 0
         Thumbnails.shared.capture(windows, points: 260) { _, _ in once += 1 }

@@ -19,7 +19,7 @@ public enum CheckGuard {
                                 callback: { _, type, event, _ in
             let from = event.getIntegerValueField(.eventSourceUserData)
             // Snap11's own Finder replacements carry its tag; anything else is the person.
-            if type != .tapDisabledByTimeout, type != .tapDisabledByUserInput, from != CheckGuard.tag, from != 0x534e_3131 {
+            if type != .tapDisabledByTimeout, type != .tapDisabledByUserInput, from != CheckGuard.tag, from != FinderKeys.tag {
                 print("ABORT: real input (\(type.rawValue)) during the check; stopping before the next step")
                 exit(4)
             }

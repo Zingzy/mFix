@@ -27,45 +27,16 @@ public enum DriveCheck {
     }
 
     private static func panels(of pid: pid_t) -> [CGRect] {
-        let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] ?? []
         let level = Int(CGWindowLevelForKey(.popUpMenuWindow))
-        return info.compactMap { w in
-            guard (w[kCGWindowOwnerPID as String] as? pid_t) == pid,
-                  let l = w[kCGWindowLayer as String] as? Int, l == level || l == level + 1,
-                  let b = w[kCGWindowBounds as String] as? NSDictionary, let r = CGRect(dictionaryRepresentation: b),
-                  r.width > 40 else { return nil }
-            return r
-        }
+        return WindowInfo.list(.optionOnScreenOnly)
+            .filter { $0.pid == pid && ($0.layer == level || $0.layer == level + 1) && $0.bounds.width > 40 }.map(\.bounds)
     }
 
     private static func windows(of pid: pid_t, level: Int) -> [CGRect] {
-        let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] ?? []
-        return info.compactMap { w in
-            guard (w[kCGWindowOwnerPID as String] as? pid_t) == pid, (w[kCGWindowLayer as String] as? Int) == level,
-                  let b = w[kCGWindowBounds as String] as? NSDictionary else { return nil }
-            return CGRect(dictionaryRepresentation: b)
-        }
+        WindowInfo.list(.optionOnScreenOnly).filter { $0.pid == pid && $0.layer == level }.map(\.bounds)
     }
 
-    private static func dockIcon(named title: String) -> CGRect? {
-        guard let dock = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock").first else { return nil }
-        let app = AXUIElementCreateApplication(dock.processIdentifier)
-        for list in (app.attr(kAXChildrenAttribute) as [AXUIElement]?) ?? [] {
-            for item in (list.attr(kAXChildrenAttribute) as [AXUIElement]?) ?? [] where (item.attr(kAXTitleAttribute) as String?) == title {
-                if let p = item.point(kAXPositionAttribute), let s = item.size(kAXSizeAttribute) { return CGRect(origin: p, size: s) }
-            }
-        }
-        return nil
-    }
-
-    /// NSWorkspace only refreshes the frontmost app from run-loop notifications, and this
-    /// check blocks its run loop, so ask Accessibility, which answers live.
-    private static func frontPID() -> pid_t? {
-        guard let app: AXUIElement = AXUIElementCreateSystemWide().attr(kAXFocusedApplicationAttribute) else { return nil }
-        var pid: pid_t = 0
-        AXUIElementGetPid(app, &pid)
-        return pid
-    }
+    private static func frontPID() -> pid_t? { Check.frontPID() }
 
     private static func name(_ pid: pid_t?) -> String {
         pid.map { "\(NSRunningApplication(processIdentifier: $0)?.localizedName ?? "?") (pid \($0))" } ?? "?"
@@ -84,31 +55,17 @@ public enum DriveCheck {
     /// check the pick lands left, the first stays right, and Snap Assist does not come back.
     public static func assist(snap11 pid: pid_t) {
         CheckGuard.begin()
-        let child = Process()
-        child.executableURL = URL(fileURLWithPath: CommandLine.arguments[0])
-        child.arguments = ["--test-windows", "3"]
-        try? child.run()
-        var failures = 0
+        let check = Check("assist check")
         defer {
             modifiers([])
-            child.terminate()
-            print(failures == 0 ? "assist check passed" : "assist check: \(failures) failed")
-            exit(failures == 0 ? 0 : 1)
+            check.finish()
         }
-        func check(_ ok: Bool, _ what: String) {
-            print(ok ? "ok  " : "FAIL", what)
-            if !ok { failures += 1 }
-        }
-        var windows: [AXWindow] = []
-        for _ in 0..<40 where windows.count < 3 {
-            usleep(100_000)
-            windows = AXWindow.windows(of: child.processIdentifier).filter(\.isStandard)
-        }
+        let windows = check.testWindows([["--test-windows", "3"]], count: 3, pump: false)
         guard windows.count == 3 else { check(false, "three test windows appeared"); return }
         let first = windows[0]
         first.focus()
         usleep(600_000)
-        guard frontPID() == child.processIdentifier else { check(false, "test windows are frontmost"); return }
+        guard frontPID() == first.pid else { check(false, "test windows are frontmost"); return }
         let work = Geo.workArea(Geo.screen(containing: first.frame))
         let win: CGEventFlags = [.maskCommand, .maskAlternate]
         modifiers(win)
@@ -133,33 +90,20 @@ public enum DriveCheck {
 
     public static func run(snap11 pid: pid_t) {
         CheckGuard.begin()
-        let child = Process()
-        child.executableURL = URL(fileURLWithPath: CommandLine.arguments[0])
-        child.arguments = ["--test-window"]
-        try? child.run()
-        var failures = 0
+        let check = Check("drive check")
         defer {
             modifiers([])
-            child.terminate()
-            print(failures == 0 ? "drive check passed" : "drive check: \(failures) failed")
-            exit(failures == 0 ? 0 : 1)
+            check.finish()
         }
-        func check(_ ok: Bool, _ what: String) {
-            print(ok ? "ok  " : "FAIL", what)
-            if !ok { failures += 1 }
+        guard let window = check.testWindows([["--test-window"]], count: 1, pump: false).first else {
+            check(false, "test window appeared"); return
         }
-        var window: AXWindow?
-        for _ in 0..<40 where window == nil {
-            usleep(100_000)
-            window = AXWindow.windows(of: child.processIdentifier).first(where: { $0.isStandard })
-        }
-        guard let window else { check(false, "test window appeared"); return }
         usleep(500_000)
-        if frontPID() != child.processIdentifier {
-            _ = SkyLight.makeFront(pid: child.processIdentifier, window: window.id)
+        if frontPID() != window.pid {
+            _ = SkyLight.makeFront(pid: window.pid, window: window.id)
             usleep(400_000)
         }
-        let front = frontPID() == child.processIdentifier
+        let front = frontPID() == window.pid
         check(front, "test window is frontmost (\(name(frontPID())))")
         // Every chord below acts on the frontmost window; never let that be one of the person's.
         guard front else { return }
@@ -197,8 +141,7 @@ public enum DriveCheck {
             let screenLeft = Geo.workArea(Geo.screen(containing: window.frame)).minX
             check(flyout.map { $0.minY > button.maxY && (abs($0.midX - c.x) < 2 || abs($0.minX - screenLeft - 8) < 1) } ?? false, "hovering the green button opens the flyout under it, centred or held 8pt inside the screen (\(flyout ?? .zero))")
             usleep(1_000_000)
-            let native = (CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] ?? [])
-                .contains { ($0[kCGWindowOwnerName as String] as? String) == "ThemeWidgetControlViewService" && ($0[kCGWindowLayer as String] as? Int) == 101 }
+            let native = WindowInfo.list(.optionOnScreenOnly).contains { $0.owner == "ThemeWidgetControlViewService" && $0.layer == 101 }
             check(!native, "macOS's own green-button popover stayed away a second later")
             if let f = flyout {
                 // One suggestion row (cmux is on this Space), then halves at the start of row two.
@@ -206,9 +149,8 @@ public enum DriveCheck {
                 mouse(.mouseMoved, CGPoint(x: target.x, y: f.minY + 4))
                 mouse(.mouseMoved, target)
                 usleep(150_000)
-                let stack = (CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] ?? []).filter {
-                    CGRect(dictionaryRepresentation: ($0[kCGWindowBounds as String] as? NSDictionary) ?? [:])?.contains(target) ?? false
-                }.prefix(3).map { "\($0[kCGWindowOwnerName as String] ?? "?")@\($0[kCGWindowLayer as String] ?? "?")" }
+                let stack = WindowInfo.list(.optionOnScreenOnly).filter { $0.bounds.contains(target) }
+                    .prefix(3).map { "\($0.owner ?? "?")@\($0.layer)" }
                 print("     windows at the click point, front first:", stack)
                 mouse(.leftMouseDown, target)
                 mouse(.leftMouseUp, target)
@@ -275,7 +217,7 @@ public enum DriveCheck {
         let expected = CGPoint(x: q.x + 4, y: q.y + 6)
         let follows = shown.contains { abs($0.minX - expected.x) < 3 && abs($0.minY - expected.y) < 3 }
         check(follows, "a file drag shows the preview under the pointer (\(shown), pointer \(q))")
-        if let cmuxIcon = dockIcon(named: "cmux") {
+        if let cmuxIcon = DockItems.read().first(where: { $0.title == "cmux" })?.frame {
             let target = CGPoint(x: cmuxIcon.midX, y: cmuxIcon.midY)
             while abs(q.y - target.y) > 10 || abs(q.x - target.x) > 10 {
                 q.x += (target.x - q.x) / 6
@@ -306,7 +248,7 @@ public enum DriveCheck {
             }
             for _ in 0..<18 { mouse(.leftMouseDragged, q); usleep(40_000) }
             usleep(300_000)
-            check(frontPID() == child.processIdentifier, "holding the drag over a card switched to it (\(name(frontPID())))")
+            check(frontPID() == window.pid, "holding the drag over a card switched to it (\(name(frontPID())))")
         }
         modifiers([])
         usleep(200_000)

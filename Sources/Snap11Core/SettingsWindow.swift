@@ -40,12 +40,12 @@ struct SettingsView: View {
 
 private struct GeneralTab: View {
     @State private var launchAtLogin = Settings.launchAtLogin
-    @AppStorage(Settings.K.snapKeys) private var snapKeys = SnapKeys.cmdOption.rawValue
-    @AppStorage(Settings.K.minimizeKeys) private var minimizeKeys = true
-    @AppStorage(Settings.K.dockNumbers) private var dockNumbers = true
-    @AppStorage(Settings.K.alwaysOnTop) private var alwaysOnTop = true
-    @AppStorage(Settings.K.finderKeys) private var finderKeys = true
-    @AppStorage(Settings.K.terminal) private var terminal = "com.mitchellh.ghostty"
+    @AppStorage(Settings.snapKeys) private var snapKeys: String
+    @AppStorage(Settings.minimizeKeys) private var minimizeKeys: Bool
+    @AppStorage(Settings.dockNumbers) private var dockNumbers: Bool
+    @AppStorage(Settings.alwaysOnTop) private var alwaysOnTop: Bool
+    @AppStorage(Settings.finderKeys) private var finderKeys: Bool
+    @AppStorage(Settings.terminal) private var terminal: String
 
     var body: some View {
         Form {
@@ -78,11 +78,11 @@ private struct GeneralTab: View {
 }
 
 private struct SnappingTab: View {
-    @AppStorage(Settings.K.snapAssist) private var snapAssist = true
-    @AppStorage(Settings.K.layoutsHover) private var layoutsHover = true
-    @AppStorage(Settings.K.hoverDelay) private var hoverDelay = 0.6
-    @AppStorage(Settings.K.dragSnap) private var dragSnap = true
-    @AppStorage(Settings.K.snapGroups) private var snapGroups = true
+    @AppStorage(Settings.snapAssist) private var snapAssist: Bool
+    @AppStorage(Settings.layoutsHover) private var layoutsHover: Bool
+    @AppStorage(Settings.hoverDelay) private var hoverDelay: Double
+    @AppStorage(Settings.dragSnap) private var dragSnap: Bool
+    @AppStorage(Settings.snapGroups) private var snapGroups: Bool
 
     var body: some View {
         Form {
@@ -93,12 +93,7 @@ private struct SnappingTab: View {
             }
             Section {
                 Toggle("Show snap layouts when I hover over a window's green button", isOn: $layoutsHover)
-                LabeledContent("Hover delay") {
-                    HStack {
-                        Slider(value: $hoverDelay, in: 0.1...1.5)
-                        Text("\(Int((hoverDelay * 100).rounded()) * 10) ms").monospacedDigit().frame(width: 64, alignment: .trailing)
-                    }
-                }
+                DelaySlider(title: "Hover delay", value: $hoverDelay, range: 0.1...1.5)
                 .disabled(!layoutsHover)
             }
         }
@@ -107,10 +102,10 @@ private struct SnappingTab: View {
 }
 
 private struct SwitcherTab: View {
-    @AppStorage(Settings.K.switcher) private var switcher = true
-    @AppStorage(Settings.K.allSpaces) private var allSpaces = true
-    @AppStorage(Settings.K.showDelay) private var showDelay = 0.09
-    @AppStorage(Settings.K.liveThumbnails) private var liveThumbnails = true
+    @AppStorage(Settings.switcher) private var switcher: Bool
+    @AppStorage(Settings.allSpaces) private var allSpaces: Bool
+    @AppStorage(Settings.showDelay) private var showDelay: Double
+    @AppStorage(Settings.liveThumbnails) private var liveThumbnails: Bool
 
     var body: some View {
         Form {
@@ -121,12 +116,7 @@ private struct SwitcherTab: View {
                     Text("Only the Space I'm on").tag(false)
                 }
                 .disabled(!switcher)
-                LabeledContent("Wait before showing") {
-                    HStack {
-                        Slider(value: $showDelay, in: 0...0.4)
-                        Text("\(Int((showDelay * 100).rounded()) * 10) ms").monospacedDigit().frame(width: 64, alignment: .trailing)
-                    }
-                }
+                DelaySlider(title: "Wait before showing", value: $showDelay, range: 0...0.4)
                 .disabled(!switcher)
                 Text("A quick Cmd+Tab under this delay switches without showing the panel.")
                     .font(.caption).foregroundStyle(.secondary)
@@ -142,20 +132,15 @@ private struct SwitcherTab: View {
 }
 
 private struct DockTab: View {
-    @AppStorage(Settings.K.dockPreviews) private var dockPreviews = true
-    @AppStorage(Settings.K.dockClicks) private var dockClicks = true
-    @AppStorage(Settings.K.dockDelay) private var dockDelay = 0.25
+    @AppStorage(Settings.dockPreviews) private var dockPreviews: Bool
+    @AppStorage(Settings.dockClicks) private var dockClicks: Bool
+    @AppStorage(Settings.dockDelay) private var dockDelay: Double
 
     var body: some View {
         Form {
             Section {
                 Toggle("Show an app's windows when I hover its Dock icon", isOn: $dockPreviews)
-                LabeledContent("Hover delay") {
-                    HStack {
-                        Slider(value: $dockDelay, in: 0...0.8)
-                        Text("\(Int((dockDelay * 100).rounded()) * 10) ms").monospacedDigit().frame(width: 64, alignment: .trailing)
-                    }
-                }
+                DelaySlider(title: "Hover delay", value: $dockDelay, range: 0...0.8)
                 .disabled(!dockPreviews)
                 Text("Windows waits about 400 ms. Once one preview is open, moving to another icon switches at once.")
                     .font(.caption).foregroundStyle(.secondary)
@@ -167,24 +152,35 @@ private struct DockTab: View {
 }
 
 private struct DragTab: View {
-    @AppStorage(Settings.K.dragPreview) private var dragPreview = true
-    @AppStorage(Settings.K.dockSpring) private var dockSpring = true
-    @AppStorage(Settings.K.springDelay) private var springDelay = 0.5
+    @AppStorage(Settings.dragPreview) private var dragPreview: Bool
+    @AppStorage(Settings.dockSpring) private var dockSpring: Bool
+    @AppStorage(Settings.springDelay) private var springDelay: Double
 
     var body: some View {
         Form {
             Section {
                 Toggle("Show a preview of what I'm dragging", isOn: $dragPreview)
                 Toggle("Holding a drag on a Dock icon brings that app forward", isOn: $dockSpring)
-                LabeledContent("Hold for") {
-                    HStack {
-                        Slider(value: $springDelay, in: 0.2...1.5)
-                        Text("\(Int((springDelay * 100).rounded()) * 10) ms").monospacedDigit().frame(width: 64, alignment: .trailing)
-                    }
-                }
+                DelaySlider(title: "Hold for", value: $springDelay, range: 0.2...1.5)
                 .disabled(!dockSpring)
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+/// A delay in seconds, shown in milliseconds rounded to tens.
+private struct DelaySlider: View {
+    let title: LocalizedStringKey
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+
+    var body: some View {
+        LabeledContent(title) {
+            HStack {
+                Slider(value: $value, in: range)
+                Text("\(Int((value * 100).rounded()) * 10) ms").monospacedDigit().frame(width: 64, alignment: .trailing)
+            }
+        }
     }
 }

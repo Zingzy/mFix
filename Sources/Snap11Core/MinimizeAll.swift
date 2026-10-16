@@ -1,14 +1,23 @@
 import AppKit
+import Carbon.HIToolbox
 
 /// Win+Home (minimize every window on this Space but the active one) and Win+D (show the
 /// desktop). Each is a toggle: the second press brings back the windows the first one
 /// minimized, if they are still minimized.
 @MainActor
-final class MinimizeAll {
+final class MinimizeAll: Feature {
     static let shared = MinimizeAll()
 
     private var minimized: [AXWindow] = []
     private var refocus: AXWindow?
+
+    func hotkeys(win: Int) -> [Hotkey] {
+        guard Settings.minimizeKeys.value else { return [] }
+        return [
+            Hotkey(Key.home, win) { self.toggle(keepActive: true) },
+            Hotkey(Key.d, win, replaces: win == cmdKey | optionKey ? [SystemShortcuts.dockHiding] : []) { self.toggle(keepActive: false) },
+        ]
+    }
 
     func toggle(keepActive: Bool, among candidates: [AXWindow]? = nil, active given: AXWindow? = nil) {
         if restoreIfPending() { return }

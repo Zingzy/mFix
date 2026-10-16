@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 
 /// The Dock's app icons in order, read through Accessibility: frame (AX coordinates) and app.
 enum DockItems {
@@ -20,9 +21,8 @@ enum DockItems {
         for list in (app.attr(kAXChildrenAttribute) as [AXUIElement]?) ?? [] {
             for item in (list.attr(kAXChildrenAttribute) as [AXUIElement]?) ?? [] {
                 guard (item.attr(kAXSubroleAttribute) as String?) == "AXApplicationDockItem",
-                      let url: URL = item.attr(kAXURLAttribute),
-                      let pos = item.point(kAXPositionAttribute), let size = item.size(kAXSizeAttribute) else { continue }
-                items.append(Item(frame: CGRect(origin: pos, size: size), url: url, title: item.attr(kAXTitleAttribute) ?? ""))
+                      let url: URL = item.attr(kAXURLAttribute), let frame = item.frame else { continue }
+                items.append(Item(frame: frame, url: url, title: item.attr(kAXTitleAttribute) ?? ""))
             }
         }
         return items
@@ -33,7 +33,12 @@ enum DockItems {
 /// back its most recent window. Already in front: step to its next window, or minimize it
 /// when it has only one, as clicking the active taskbar button does on Windows.
 @MainActor
-enum DockApps {
+struct DockApps: Feature {
+    func hotkeys(win: Int) -> [Hotkey] {
+        guard Settings.dockNumbers.value else { return [] }
+        return Key.digits.enumerated().map { n, code in Hotkey(code, win) { DockApps.activate(n + 1) } }
+    }
+
     static func activate(_ n: Int) {
         let items = DockItems.read()
         guard items.indices.contains(n - 1) else { return }

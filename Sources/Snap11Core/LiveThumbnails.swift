@@ -13,15 +13,19 @@ final class LiveThumbnails {
     private var points: CGFloat = 300
     private var onImage: ((CGWindowID, CGImage) -> Void)?
 
+    /// A fresh image of each window now, then live ones until `stop`.
+    func show(_ windows: [AXWindow], points: CGFloat, onImage: @escaping (CGWindowID, CGImage) -> Void) {
+        Thumbnails.shared.capture(windows, points: points, onImage: onImage)
+        start(windows, points: points, onImage: onImage)
+    }
+
     func start(_ windows: [AXWindow], points: CGFloat, onImage: @escaping (CGWindowID, CGImage) -> Void) {
         stop()
-        guard Settings.liveThumbnails else { return }
+        guard Settings.liveThumbnails.value else { return }
         self.windows = windows
         self.points = points
         self.onImage = onImage
-        timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.tick() }
-        }
+        timer = Timer.onMain(after: interval, repeats: true) { [weak self] in self?.tick() }
     }
 
     func stop() {
@@ -34,8 +38,7 @@ final class LiveThumbnails {
 
     private func tick() {
         guard !busy, let onImage else { return }
-        let onScreen = Set((CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
-            as? [[String: Any]] ?? []).compactMap { $0[kCGWindowNumber as String] as? CGWindowID })
+        let onScreen = Set(WindowInfo.onScreen.map(\.id))
         let live = windows.filter { onScreen.contains($0.id) }
         guard !live.isEmpty else { return }
         busy = true

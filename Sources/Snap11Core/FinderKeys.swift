@@ -7,11 +7,11 @@ import AppKit
 /// It needs an active tap to swallow the original key. The tap only exists while Finder is
 /// frontmost, since an active tap is in the path of every keystroke.
 @MainActor
-final class FinderKeys {
+final class FinderKeys: Feature {
     static let shared = FinderKeys()
 
     /// Marks the keys Snap11 posts so its own tap lets them through.
-    private static let tag: Int64 = 0x534e_3131
+    nonisolated static let tag: Int64 = 0x534e_3131
     private var tap: CFMachPort?
     private var swallowedUps: Set<Int64> = []
     private var cutCount: Int?
@@ -26,7 +26,7 @@ final class FinderKeys {
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] note in
             let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
             let finder = app?.bundleIdentifier == "com.apple.finder"
-            MainActor.assumeIsolated { self?.setActive(finder && Settings.finderKeys) }
+            MainActor.assumeIsolated { self?.setActive(finder && Settings.finderKeys.value) }
         }
         NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.refresh() }
@@ -35,7 +35,7 @@ final class FinderKeys {
     }
 
     private func refresh() {
-        setActive(NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.apple.finder" && Settings.finderKeys)
+        setActive(NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.apple.finder" && Settings.finderKeys.value)
     }
 
     private func setActive(_ on: Bool) {
@@ -111,9 +111,7 @@ final class FinderKeys {
             guard let cut = cutCount, cut == NSPasteboard.general.changeCount else { return false }
             cutCount = nil
             let sources = (NSPasteboard.general.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]) ?? []
-            DispatchQueue.main.async {
-                MainActor.assumeIsolated { FinderKeys.shared.paste(sources) }
-            }
+            onMain { FinderKeys.shared.paste(sources) }
         case (Code.l, false):
             guard press(Self.goToFolder) else { return false }
         default: return false
@@ -125,17 +123,15 @@ final class FinderKeys {
     /// Finder writes the copied files to the pasteboard some time after the key; the cut
     /// counts once the pasteboard has actually changed.
     private func awaitCopy(after before: Int, tries: Int) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            MainActor.assumeIsolated {
-                let now = NSPasteboard.general.changeCount
-                if now != before {
-                    FinderKeys.shared.cutCount = now
-                    if Hotkeys.debug { NSLog("Snap11: finder cut recorded at %ld", now) }
-                } else if tries > 0 {
-                    FinderKeys.shared.awaitCopy(after: before, tries: tries - 1)
-                } else if Hotkeys.debug {
-                    NSLog("Snap11: finder cut: pasteboard never changed after Cmd+C")
-                }
+        onMain(after: 0.05) {
+            let now = NSPasteboard.general.changeCount
+            if now != before {
+                FinderKeys.shared.cutCount = now
+                if Hotkeys.debug { NSLog("Snap11: finder cut recorded at %ld", now) }
+            } else if tries > 0 {
+                FinderKeys.shared.awaitCopy(after: before, tries: tries - 1)
+            } else if Hotkeys.debug {
+                NSLog("Snap11: finder cut: pasteboard never changed after Cmd+C")
             }
         }
     }
@@ -182,7 +178,7 @@ final class FinderKeys {
                     }
                 }
             }
-            DispatchQueue.main.async { MainActor.assumeIsolated { FinderKeys.shared.menuItems = found } }
+            onMain { FinderKeys.shared.menuItems = found }
         }
     }
 
@@ -192,9 +188,7 @@ final class FinderKeys {
         // Off the main thread: the first script call waits on macOS asking the person.
         DispatchQueue.global(qos: .userInitiated).async {
             let (top, selected) = FinderScript.windowAndSelection()
-            DispatchQueue.main.async {
-                MainActor.assumeIsolated { FinderKeys.shared.paste(sources, top: top, selected: selected) }
-            }
+            onMain { FinderKeys.shared.paste(sources, top: top, selected: selected) }
         }
     }
 

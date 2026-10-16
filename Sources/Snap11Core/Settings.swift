@@ -1,81 +1,51 @@
 import AppKit
+import Carbon.HIToolbox
 import ServiceManagement
+import SwiftUI
 
-/// Every switch and delay, in UserDefaults so the settings window (bound with @AppStorage
-/// to the same keys) and the features read one source.
+/// One switch or delay in UserDefaults, with its default. The settings window binds the same
+/// key through @AppStorage, so the window and the features read one source.
+struct Setting<Value> {
+    let key: String
+    let initial: Value
+
+    var value: Value { UserDefaults.standard.object(forKey: key) as? Value ?? initial }
+}
+
+extension AppStorage where Value == Bool {
+    init(_ setting: Setting<Bool>) { self.init(wrappedValue: setting.initial, setting.key) }
+}
+
+extension AppStorage where Value == Double {
+    init(_ setting: Setting<Double>) { self.init(wrappedValue: setting.initial, setting.key) }
+}
+
+extension AppStorage where Value == String {
+    init(_ setting: Setting<String>) { self.init(wrappedValue: setting.initial, setting.key) }
+}
+
 enum Settings {
-    enum K {
-        static let snapKeys = "snap.keys"
-        static let snapAssist = "snap.assist"
-        static let layoutsHover = "snap.layoutsHover"
-        static let hoverDelay = "snap.hoverDelay"
-        static let dragSnap = "snap.drag"
-        static let switcher = "switcher.enabled"
-        static let allSpaces = "switcher.allSpaces"
-        static let showDelay = "switcher.showDelay"
-        static let dragPreview = "drag.preview"
-        static let dockSpring = "drag.dockSpring"
-        static let springDelay = "drag.springDelay"
-        static let minimizeKeys = "minimize.enabled"
-        static let dockNumbers = "dock.numbers"
-        static let finderKeys = "finder.keys"
-        static let dockPreviews = "dock.previews"
-        static let dockClicks = "dock.clicks"
-        static let dockDelay = "dock.delay"
-        static let snapGroups = "snap.groups"
-        static let liveThumbnails = "thumbnails.live"
-        static let terminal = "finder.terminal"
-        static let alwaysOnTop = "pin.enabled"
-    }
-
-    static func register() {
-        UserDefaults.standard.register(defaults: [
-            K.snapKeys: SnapKeys.cmdOption.rawValue,
-            K.snapAssist: true,
-            K.layoutsHover: true,
-            K.hoverDelay: 0.6,
-            K.dragSnap: true,
-            K.switcher: true,
-            K.allSpaces: true,
-            K.showDelay: 0.09,
-            K.dragPreview: true,
-            K.dockSpring: true,
-            K.springDelay: 0.5,
-            K.minimizeKeys: true,
-            K.dockNumbers: true,
-            K.finderKeys: true,
-            K.dockPreviews: true,
-            K.dockClicks: true,
-            K.dockDelay: 0.25,
-            K.snapGroups: true,
-            K.liveThumbnails: true,
-            K.terminal: "com.mitchellh.ghostty",
-            K.alwaysOnTop: true,
-        ])
-    }
-
-    private static var d: UserDefaults { .standard }
-    static var snapKeys: SnapKeys { SnapKeys(rawValue: d.string(forKey: K.snapKeys) ?? "") ?? .cmdOption }
-    static var snapAssist: Bool { d.bool(forKey: K.snapAssist) }
-    static var layoutsHover: Bool { d.bool(forKey: K.layoutsHover) }
-    static var hoverDelay: TimeInterval { d.double(forKey: K.hoverDelay) }
-    static var dragSnap: Bool { d.bool(forKey: K.dragSnap) }
-    static var switcher: Bool { d.bool(forKey: K.switcher) }
-    static var allSpaces: Bool { d.bool(forKey: K.allSpaces) }
-    static var showDelay: TimeInterval { d.double(forKey: K.showDelay) }
-    static var dragPreview: Bool { d.bool(forKey: K.dragPreview) }
-    static var dockSpring: Bool { d.bool(forKey: K.dockSpring) }
-    static var springDelay: TimeInterval { d.double(forKey: K.springDelay) }
-    static var minimizeKeys: Bool { d.bool(forKey: K.minimizeKeys) }
-    static var dockNumbers: Bool { d.bool(forKey: K.dockNumbers) }
-    static var finderKeys: Bool { d.bool(forKey: K.finderKeys) }
-    static var dockPreviews: Bool { d.bool(forKey: K.dockPreviews) }
-    static var dockClicks: Bool { d.bool(forKey: K.dockClicks) }
-    static var dockDelay: TimeInterval { d.double(forKey: K.dockDelay) }
-    static var snapGroups: Bool { d.bool(forKey: K.snapGroups) }
-    static var liveThumbnails: Bool { d.bool(forKey: K.liveThumbnails) }
-    static var terminal: String { d.string(forKey: K.terminal) ?? "" }
-    static var alwaysOnTop: Bool { d.bool(forKey: K.alwaysOnTop) }
+    static let snapKeys = Setting(key: "snap.keys", initial: SnapKeys.cmdOption.rawValue)
+    static let snapAssist = Setting(key: "snap.assist", initial: true)
+    static let layoutsHover = Setting(key: "snap.layoutsHover", initial: true)
+    static let hoverDelay = Setting(key: "snap.hoverDelay", initial: 0.6)
+    static let dragSnap = Setting(key: "snap.drag", initial: true)
+    static let switcher = Setting(key: "switcher.enabled", initial: true)
+    static let allSpaces = Setting(key: "switcher.allSpaces", initial: true)
+    static let showDelay = Setting(key: "switcher.showDelay", initial: 0.09)
+    static let dragPreview = Setting(key: "drag.preview", initial: true)
+    static let dockSpring = Setting(key: "drag.dockSpring", initial: true)
+    static let springDelay = Setting(key: "drag.springDelay", initial: 0.5)
+    static let minimizeKeys = Setting(key: "minimize.enabled", initial: true)
+    static let dockNumbers = Setting(key: "dock.numbers", initial: true)
+    static let finderKeys = Setting(key: "finder.keys", initial: true)
+    static let dockPreviews = Setting(key: "dock.previews", initial: true)
+    static let dockClicks = Setting(key: "dock.clicks", initial: true)
+    static let dockDelay = Setting(key: "dock.delay", initial: 0.25)
+    static let snapGroups = Setting(key: "snap.groups", initial: true)
+    static let liveThumbnails = Setting(key: "thumbnails.live", initial: true)
+    static let terminal = Setting(key: "finder.terminal", initial: "com.mitchellh.ghostty")
+    static let alwaysOnTop = Setting(key: "pin.enabled", initial: true)
 
     /// Launch at login lives with the system, not in UserDefaults.
     static var launchAtLogin: Bool {
@@ -94,6 +64,8 @@ enum Settings {
 enum SnapKeys: String, CaseIterable, Identifiable {
     case cmdOption, ctrlOption, ctrlCmd
 
+    static var current: SnapKeys { SnapKeys(rawValue: Settings.snapKeys.value) ?? .cmdOption }
+
     var id: String { rawValue }
 
     var label: String {
@@ -101,6 +73,14 @@ enum SnapKeys: String, CaseIterable, Identifiable {
         case .cmdOption: "Cmd + Option"
         case .ctrlOption: "Control + Option"
         case .ctrlCmd: "Control + Cmd"
+        }
+    }
+
+    var modifiers: Int {
+        switch self {
+        case .cmdOption: cmdKey | optionKey
+        case .ctrlOption: controlKey | optionKey
+        case .ctrlCmd: controlKey | cmdKey
         }
     }
 }

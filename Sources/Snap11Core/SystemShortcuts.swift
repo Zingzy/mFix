@@ -6,7 +6,8 @@ import Foundation
 /// to disk before Snap11 first turns it off, and put back on every way out, including the
 /// launch after a kill -9.
 enum SystemShortcuts {
-    static let switcher: [Int32] = [1, 2]
+    static let cmdTab: Int32 = 1
+    static let cmdShiftTab: Int32 = 2
     static let dockHiding: Int32 = 52
     private static let key = "system.shortcutsBeforeSnap11"
 

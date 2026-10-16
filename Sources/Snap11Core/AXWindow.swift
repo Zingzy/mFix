@@ -8,18 +8,20 @@ extension AXUIElement {
         return value as? T
     }
 
-    func point(_ name: String) -> CGPoint? {
-        var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(self, name as CFString, &value) == .success, let value else { return nil }
-        var p = CGPoint.zero
-        return AXValueGetValue(value as! AXValue, .cgPoint, &p) ? p : nil
+    func point(_ name: String) -> CGPoint? { value(name, .cgPoint, CGPoint.zero) }
+
+    func size(_ name: String) -> CGSize? { value(name, .cgSize, CGSize.zero) }
+
+    var frame: CGRect? {
+        guard let p = point(kAXPositionAttribute), let s = size(kAXSizeAttribute) else { return nil }
+        return CGRect(origin: p, size: s)
     }
 
-    func size(_ name: String) -> CGSize? {
+    private func value<T: BitwiseCopyable>(_ name: String, _ type: AXValueType, _ empty: T) -> T? {
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(self, name as CFString, &value) == .success, let value else { return nil }
-        var s = CGSize.zero
-        return AXValueGetValue(value as! AXValue, .cgSize, &s) ? s : nil
+        var result = empty
+        return AXValueGetValue(value as! AXValue, type, &result) ? result : nil
     }
 
     @discardableResult
@@ -141,10 +143,7 @@ final class AXWindow: Hashable {
     /// The green traffic light. Its subrole is AXFullScreenButton; AXZoomButton is the
     /// Option-click variant.
     var fullScreenButtonFrame: CGRect? {
-        guard let button: AXUIElement = element?.attr(kAXFullScreenButtonAttribute),
-              let p = button.point(kAXPositionAttribute),
-              let s = button.size(kAXSizeAttribute) else { return nil }
-        return CGRect(origin: p, size: s)
+        (element?.attr(kAXFullScreenButtonAttribute) as AXUIElement?)?.frame
     }
 
     static func focused() -> AXWindow? {
@@ -163,5 +162,36 @@ final class AXWindow: Hashable {
         let appElement = AXUIElementCreateApplication(pid)
         let list: [AXUIElement] = appElement.attr(kAXWindowsAttribute) ?? []
         return list.map { AXWindow(element: $0, pid: pid) }
+    }
+}
+
+/// One app's Accessibility notifications on the main run loop, each handed over with the id
+/// of the window it came from.
+final class AXWatcher {
+    private let observer: AXObserver
+    private let mode: CFRunLoopMode
+    private let handler: (CGWindowID, String) -> Void
+
+    init?(pid: pid_t, mode: CFRunLoopMode = .commonModes, _ handler: @escaping (CGWindowID, String) -> Void) {
+        var observer: AXObserver?
+        guard AXObserverCreate(pid, { _, element, notification, refcon in
+            var id: CGWindowID = 0
+            _AXUIElementGetWindow(element, &id)
+            Unmanaged<AXWatcher>.fromOpaque(refcon!).takeUnretainedValue().handler(id, notification as String)
+        }, &observer) == .success, let observer else { return nil }
+        self.observer = observer
+        self.mode = mode
+        self.handler = handler
+        CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), mode)
+    }
+
+    deinit {
+        CFRunLoopRemoveSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), mode)
+    }
+
+    func watch(_ element: AXUIElement, _ notifications: [String]) {
+        for n in notifications {
+            AXObserverAddNotification(observer, element, n as CFString, Unmanaged.passUnretained(self).toOpaque())
+        }
     }
 }

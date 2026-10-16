@@ -5,13 +5,15 @@ import AppKit
 /// edge shows Windows' divider handle, which resizes both at once. Moving a member out of
 /// place or closing it takes it out; minimizing does not.
 @MainActor
-final class SnapGroups {
+final class SnapGroups: Feature {
     static let shared = SnapGroups()
 
     final class Group {
         var members: [AXWindow]
         var frames: [CGWindowID: CGRect]
         let screenID: CGDirectDisplayID
+
+        var screen: NSScreen { NSScreen.screens.first { $0.displayID == screenID } ?? NSScreen.screens[0] }
 
         init(members: [AXWindow], screenID: CGDirectDisplayID) {
             self.members = members
@@ -21,7 +23,7 @@ final class SnapGroups {
     }
 
     private(set) var groups: [Group] = []
-    private var observers: [pid_t: AXObserver] = [:]
+    private var watchers: [pid_t: AXWatcher] = [:]
     /// Frames Snap11 itself just set; their move and resize notifications are ignored.
     private var settling: [CGWindowID: Date] = [:]
     private let divider = DividerHandle()
@@ -66,21 +68,10 @@ final class SnapGroups {
 
     private func watch(_ w: AXWindow) {
         guard let element = w.element else { return }
-        if observers[w.pid] == nil {
-            var obs: AXObserver?
-            guard AXObserverCreate(w.pid, { _, element, notification, _ in
-                var id: CGWindowID = 0
-                _AXUIElementGetWindow(element, &id)
-                let name = notification as String
-                DispatchQueue.main.async { MainActor.assumeIsolated { SnapGroups.shared.changed(id, name) } }
-            }, &obs) == .success, let obs else { return }
-            CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(obs), .commonModes)
-            observers[w.pid] = obs
+        if watchers[w.pid] == nil {
+            watchers[w.pid] = AXWatcher(pid: w.pid) { id, name in onMain { SnapGroups.shared.changed(id, name) } }
         }
-        guard let obs = observers[w.pid] else { return }
-        for n in [kAXResizedNotification, kAXMovedNotification, kAXUIElementDestroyedNotification] {
-            AXObserverAddNotification(obs, element, n as CFString, nil)
-        }
+        watchers[w.pid]?.watch(element, [kAXResizedNotification, kAXMovedNotification, kAXUIElementDestroyedNotification])
     }
 
     private func changed(_ id: CGWindowID, _ notification: String) {
@@ -181,7 +172,7 @@ final class SnapGroups {
 
     private func pointerMoved() {
         guard !divider.dragging else { return }
-        let p = Geo.flip(NSEvent.mouseLocation)
+        let p = Geo.pointer
         guard let edge = sharedEdge(at: p) else {
             divider.hide()
             return
@@ -222,7 +213,7 @@ final class SnapGroups {
 /// Drag it to move the line.
 @MainActor
 final class DividerHandle {
-    private let panel = OverlayPanel(takesKeyboard: false)
+    private let panel = OverlayPanel()
     private let view = HandleView()
     private(set) var dragging = false
     private var onDrag: ((CGFloat, Bool) -> Void)?

@@ -1,5 +1,29 @@
 import AppKit
 
+/// A panel's root view on a blurred, tinted background with smooth corners. A 9-slice mask
+/// instead of a layer corner radius, which aliases on NSVisualEffectView.
+@MainActor
+func acrylicRoot(size: CGSize) -> NSView {
+    let radius: CGFloat = 8
+    let v = NSVisualEffectView(frame: NSRect(origin: .zero, size: size))
+    v.material = .hudWindow
+    v.blendingMode = .behindWindow
+    v.state = .active
+    v.appearance = Theme.appearance
+    let edge = radius * 2 + 1
+    let mask = NSImage(size: NSSize(width: edge, height: edge), flipped: false) { rect in
+        NSColor.black.setFill()
+        NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
+        return true
+    }
+    mask.capInsets = NSEdgeInsets(top: radius, left: radius, bottom: radius, right: radius)
+    mask.resizingMode = .stretch
+    v.maskImage = mask
+    let root = NSView(frame: v.frame)
+    root.addSubview(v)
+    return root
+}
+
 /// Colours that follow the system light/dark mode, as Windows 11 does since build 22538.
 @MainActor
 enum Theme {

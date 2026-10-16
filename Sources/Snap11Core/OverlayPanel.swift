@@ -7,12 +7,12 @@ final class OverlayPanel: NSPanel {
     var onKey: ((NSEvent) -> Bool)?
     var onResignKey: (() -> Void)?
 
-    init(takesKeyboard: Bool) {
+    init(takesKeyboard: Bool = false, level: NSWindow.Level = .popUpMenu, clickThrough: Bool = false) {
         self.takesKeyboard = takesKeyboard
         super.init(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         // isFloatingPanel resets the level to .floating, so it goes first.
         isFloatingPanel = true
-        level = .popUpMenu
+        self.level = level
         hidesOnDeactivate = false
         animationBehavior = .none
         backgroundColor = .clear
@@ -20,7 +20,7 @@ final class OverlayPanel: NSPanel {
         hasShadow = false
         // A clear borderless window lets clicks fall through its transparent pixels unless
         // this is set explicitly.
-        ignoresMouseEvents = false
+        ignoresMouseEvents = clickThrough
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient, .ignoresCycle]
         becomesKeyOnlyIfNeeded = !takesKeyboard
     }

@@ -1,17 +1,19 @@
 import AppKit
+import Carbon.HIToolbox
 
 /// The Snap Layouts flyout: hover a window's green button (or press the Win+Z chord) and
 /// a grid of layouts drops below it. Hovering a zone lights it in the accent colour,
 /// clicking snaps the window there and Snap Assist fills the rest.
 @MainActor
-final class LayoutFlyout {
+final class LayoutFlyout: Feature {
     static let shared = LayoutFlyout()
 
-
-    let panel = OverlayPanel(takesKeyboard: false)
+    // macOS's own green-button popover lives at the pop-up menu level; stay above it.
+    private static let level = NSWindow.Level(rawValue: NSWindow.Level.popUpMenu.rawValue + 1)
+    let panel = OverlayPanel(level: LayoutFlyout.level)
     /// Sits over the green button while the flyout is open, so the app sees the pointer leave
     /// its button and macOS never starts its own Move & Resize popover there.
-    private let shield = OverlayPanel(takesKeyboard: false)
+    private let shield = OverlayPanel(level: LayoutFlyout.level)
     private var grid: LayoutGrid?
     private var target: AXWindow?
     private var screen: NSScreen?
@@ -25,9 +27,6 @@ final class LayoutFlyout {
     private(set) var isOpen = false
 
     private init() {
-        // macOS's own green-button popover lives at the pop-up menu level; stay above it.
-        panel.level = NSWindow.Level(rawValue: NSWindow.Level.popUpMenu.rawValue + 1)
-        shield.level = panel.level
         let catcher = BackdropView()
         catcher.wantsLayer = true
         catcher.layer?.backgroundColor = NSColor(white: 0, alpha: 0.004).cgColor
@@ -40,6 +39,13 @@ final class LayoutFlyout {
                 self.close()
             }
         }
+    }
+
+    func hotkeys(win: Int) -> [Hotkey] {
+        [Hotkey(Key.z, win) {
+            SnapAssist.shared.end(focusLast: false)
+            self.openForFocused()
+        }]
     }
 
     func start() {
@@ -63,28 +69,24 @@ final class LayoutFlyout {
             // Check the last position too, or a pointer that stops right after a quick move
             // onto the button is never looked at.
             if trailing == nil {
-                trailing = Timer.scheduledTimer(withTimeInterval: 0.03, repeats: false) { [weak self] _ in
-                    MainActor.assumeIsolated {
-                        self?.trailing = nil
-                        self?.mouseMoved()
-                    }
+                trailing = Timer.onMain(after: 0.03) { [weak self] in
+                    self?.trailing = nil
+                    self?.mouseMoved()
                 }
             }
             return
         }
         lastMove = now
-        let p = Geo.flip(NSEvent.mouseLocation)
+        let p = Geo.pointer
 
-        if !isOpen && !Settings.layoutsHover { return }
+        if !isOpen && !Settings.layoutsHover.value { return }
         if isOpen {
             let overPanel = panel.frame.contains(NSEvent.mouseLocation)
             if overPanel || anchor.insetBy(dx: -6, dy: -6).contains(p) || panel.takesKeyboard {
                 leaveTimer?.invalidate()
                 leaveTimer = nil
             } else if leaveTimer == nil {
-                leaveTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: false) { [weak self] _ in
-                    MainActor.assumeIsolated { self?.close() }
-                }
+                leaveTimer = Timer.onMain(after: 0.3) { [weak self] in self?.close() }
             }
             return
         }
@@ -106,18 +108,15 @@ final class LayoutFlyout {
         if Hotkeys.debug { NSLog("Snap11: hover on green button of %u, timer started", wid) }
         cancelHover()
         hoverWindow = wid
-        hoverTimer = Timer.scheduledTimer(withTimeInterval: Settings.hoverDelay, repeats: false) { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self else { return }
-                self.hoverTimer = nil
-                let now = Geo.flip(NSEvent.mouseLocation)
-                guard button.insetBy(dx: -2, dy: -2).contains(now), NSEvent.pressedMouseButtons == 0,
-                      let window = AXWindow.windows(of: pid).first(where: { $0.id == wid }) else {
-                    if Hotkeys.debug { NSLog("Snap11: hover timer fired but pointer left or window gone") }
-                    return
-                }
-                self.open(for: window, anchor: button, keyboard: false)
+        hoverTimer = Timer.onMain(after: Settings.hoverDelay.value) { [weak self] in
+            guard let self else { return }
+            self.hoverTimer = nil
+            guard button.insetBy(dx: -2, dy: -2).contains(Geo.pointer), NSEvent.pressedMouseButtons == 0,
+                  let window = AXWindow.windows(of: pid).first(where: { $0.id == wid }) else {
+                if Hotkeys.debug { NSLog("Snap11: hover timer fired but pointer left or window gone") }
+                return
             }
+            self.open(for: window, anchor: button, keyboard: false)
         }
     }
 
@@ -178,14 +177,11 @@ final class LayoutFlyout {
         self.grid = grid
 
         let size = grid.fittingSize
-        let bg = acrylicView(radius: 8)
-        bg.frame = NSRect(origin: .zero, size: size)
-        let root = NSView(frame: bg.frame)
-        root.addSubview(bg)
-        grid.frame = bg.frame
+        let root = acrylicRoot(size: size)
+        grid.frame = root.bounds
         root.addSubview(grid)
         let border = CALayer()
-        border.frame = bg.frame
+        border.frame = root.bounds
         border.cornerRadius = 8
         border.cornerCurve = .continuous
         border.borderWidth = 1
@@ -242,7 +238,7 @@ final class LayoutFlyout {
                 SnapEngine.shared.place(w, zone: layout.zones[i], on: screen)
                 if w != target { placed.append(w) }
             }
-            if Settings.snapGroups { SnapGroups.shared.join(placed, with: target, on: screen) }
+            if Settings.snapGroups.value { SnapGroups.shared.join(placed, with: target, on: screen) }
             target.focus()
             return
         }
