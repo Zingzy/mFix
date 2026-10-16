@@ -2,6 +2,17 @@
 
 All notable changes to mFix are listed here. Versions follow [Semantic Versioning](https://semver.org).
 
+## [0.1.1] - 2026-10-17
+
+### Fixed
+
+- mFix froze for seconds at a time when any app was slow to answer Accessibility, as Caffeine and some WebKit helpers are. Snap Assist hung, Cmd+Tab took up to 3 s to open, and drags and Dock spring loading were missed. Every Accessibility call now gives up after 0.3 s, apps are asked at once instead of one by one, and an app that stops answering is skipped until it answers again. Listing windows went from 1.5 s to under 10 ms.
+- Cmd+Tab no longer waits on apps macOS napped while you were away. It shows their last known windows and catches up in the background.
+
+### Changed
+
+- Dock window previews show the moment you hover an icon. The delay is still in Settings.
+
 ## [0.1.0] - 2026-10-16
 
 The first public release. Requires macOS 26.
@@ -38,4 +49,5 @@ The first public release. Requires macOS 26.
 
 - A settings window with a switch for every feature, and launch at login.
 
+[0.1.1]: https://github.com/Zingzy/mFix/releases/tag/v0.1.1
 [0.1.0]: https://github.com/Zingzy/mFix/releases/tag/v0.1.0
