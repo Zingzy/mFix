@@ -4,6 +4,25 @@ import AppKit
 /// windows go last, matching Windows, where minimizing sends a window to the end of the
 /// Alt+Tab list. Windows never focused since launch fall back to z-order.
 enum WindowList {
+    /// The topmost ordinary window of another app under `p` (AX coordinates), skipping
+    /// menus, panels, the menu bar and invisible windows above it.
+    static func windowAt(_ p: CGPoint) -> (id: CGWindowID, pid: pid_t, bounds: CGRect)? {
+        let own = ProcessInfo.processInfo.processIdentifier
+        let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
+            as? [[String: Any]] ?? []
+        for w in info {
+            guard let b = w[kCGWindowBounds as String] as? NSDictionary,
+                  let bounds = CGRect(dictionaryRepresentation: b), bounds.contains(p) else { continue }
+            let layer = w[kCGWindowLayer as String] as? Int ?? 0
+            let alpha = w[kCGWindowAlpha as String] as? Double ?? 1
+            if layer != 0 || alpha == 0 { continue }
+            guard let id = w[kCGWindowNumber as String] as? CGWindowID,
+                  let pid = w[kCGWindowOwnerPID as String] as? pid_t, pid != own else { return nil }
+            return (id, pid, bounds)
+        }
+        return nil
+    }
+
     static func currentSpace(excluding: Set<CGWindowID> = []) -> [AXWindow] {
         let ownPID = ProcessInfo.processInfo.processIdentifier
         let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)

@@ -35,6 +35,15 @@ public enum DriveCheck {
         }
     }
 
+    private static func windows(of pid: pid_t, level: Int) -> [CGRect] {
+        let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] ?? []
+        return info.compactMap { w in
+            guard (w[kCGWindowOwnerPID as String] as? pid_t) == pid, (w[kCGWindowLayer as String] as? Int) == level,
+                  let b = w[kCGWindowBounds as String] as? NSDictionary else { return nil }
+            return CGRect(dictionaryRepresentation: b)
+        }
+    }
+
     /// NSWorkspace only refreshes the frontmost app from run-loop notifications, and this
     /// check blocks its run loop, so ask Accessibility, which answers live.
     private static func frontPID() -> pid_t? {
@@ -45,7 +54,7 @@ public enum DriveCheck {
     }
 
     private static func name(_ pid: pid_t?) -> String {
-        pid.flatMap { NSRunningApplication(processIdentifier: $0)?.localizedName } ?? "?"
+        pid.map { "\(NSRunningApplication(processIdentifier: $0)?.localizedName ?? "?") (pid \($0))" } ?? "?"
     }
 
     private static func mouse(_ type: CGEventType, _ p: CGPoint) {
@@ -78,7 +87,14 @@ public enum DriveCheck {
         }
         guard let window else { check(false, "test window appeared"); return }
         usleep(500_000)
-        check(frontPID() == child.processIdentifier, "test window is frontmost (\(name(frontPID())))")
+        if frontPID() != child.processIdentifier {
+            _ = SkyLight.makeFront(pid: child.processIdentifier, window: window.id)
+            usleep(400_000)
+        }
+        let front = frontPID() == child.processIdentifier
+        check(front, "test window is frontmost (\(name(frontPID())))")
+        // Every chord below acts on the frontmost window; never let that be one of the person's.
+        guard front else { return }
         let work = Geo.workArea(Geo.screen(containing: window.frame))
 
         let win: CGEventFlags = [.maskCommand, .maskAlternate]
@@ -101,7 +117,7 @@ public enum DriveCheck {
         let home = CGEvent(source: nil)?.location ?? .zero
         defer { mouse(.mouseMoved, home) }
         window.focus()
-        usleep(300_000)
+        usleep(600_000)
         if let button = window.fullScreenButtonFrame {
             let c = CGPoint(x: button.midX, y: button.midY)
             mouse(.mouseMoved, CGPoint(x: c.x + 40, y: c.y + 40))
@@ -139,6 +155,42 @@ public enum DriveCheck {
         } else {
             check(false, "test window exposes its green button")
         }
+
+        // Drag to snap: float the window, then drag its title bar to the left edge.
+        window.setFrame(CGRect(x: 300, y: 250, width: 600, height: 432))
+        usleep(300_000)
+        let floating = window.frame
+        let grab = CGPoint(x: floating.midX, y: floating.minY + 12)
+        mouse(.mouseMoved, grab)
+        mouse(.leftMouseDown, grab)
+        var p = grab
+        while p.x > 1 {
+            p.x = max(0, p.x - 40)
+            mouse(.leftMouseDragged, p)
+        }
+        usleep(400_000)
+        let previews = windows(of: pid, level: 0)
+        check(previews.contains { $0.isClose(to: Zone.left.frame(in: work).insetBy(dx: 8, dy: 8), tolerance: 3) },
+              "dragging to the left edge shows the preview (\(previews))")
+        mouse(.leftMouseUp, p)
+        usleep(600_000)
+        check(window.frame.isClose(to: Zone.left.frame(in: work), tolerance: 2), "releasing on the edge snapped left (\(window.frame))")
+        check(panels(of: pid).contains { $0.isClose(to: Zone.right.frame(in: work), tolerance: 2) }, "Snap Assist opened on the right")
+        key(Key.escape, down: true, flags: [])
+        key(Key.escape, down: false, flags: [])
+        usleep(300_000)
+
+        // Drag it back out: the pre-snap size comes back under the pointer.
+        let snapped = window.frame
+        let grab2 = CGPoint(x: snapped.midX, y: snapped.minY + 12)
+        mouse(.mouseMoved, grab2)
+        mouse(.leftMouseDown, grab2)
+        for i in 1...8 { mouse(.leftMouseDragged, CGPoint(x: grab2.x + CGFloat(i * 30), y: grab2.y + CGFloat(i * 20))) }
+        mouse(.leftMouseUp, CGPoint(x: grab2.x + 240, y: grab2.y + 160))
+        usleep(400_000)
+        let out = window.frame
+        check(abs(out.width - floating.width) < 2 && abs(out.height - floating.height) < 2,
+              "dragging the snapped window out restored its size (\(out.size), want \(floating.size))")
 
         let before = frontPID()
         modifiers(.maskCommand)

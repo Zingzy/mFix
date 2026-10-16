@@ -84,6 +84,14 @@ final class SnapEngine {
 
     func forget(_ window: AXWindow) { records[window.id] = nil }
 
+    /// Dragging a snapped or maximized window out of place: hands back its restore frame and
+    /// forgets the snap, if Snap11 put it at `frame`.
+    func takeRestoreFrame(for window: AXWindow, snappedAt frame: CGRect) -> CGRect? {
+        guard let r = records[window.id], r.lastSet.isClose(to: frame, tolerance: 2) else { return nil }
+        records[window.id] = nil
+        return r.restore
+    }
+
     // MARK: Win+Arrow
 
     /// Returns the zone the window landed in, so the caller can offer Snap Assist.

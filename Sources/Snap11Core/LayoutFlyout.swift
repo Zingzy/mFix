@@ -24,6 +24,7 @@ final class LayoutFlyout {
     private var leaveTimer: Timer?
     private var buttonCache: [CGWindowID: (bounds: CGRect, button: CGRect?)] = [:]
     private var lastMove = Date.distantPast
+    private var trailing: Timer?
     private(set) var isOpen = false
 
     private init() {
@@ -61,7 +62,19 @@ final class LayoutFlyout {
 
     private func mouseMoved() {
         let now = Date()
-        guard now.timeIntervalSince(lastMove) > 0.025 else { return }
+        guard now.timeIntervalSince(lastMove) > 0.025 else {
+            // Check the last position too, or a pointer that stops right after a quick move
+            // onto the button is never looked at.
+            if trailing == nil {
+                trailing = Timer.scheduledTimer(withTimeInterval: 0.03, repeats: false) { [weak self] _ in
+                    MainActor.assumeIsolated {
+                        self?.trailing = nil
+                        self?.mouseMoved()
+                    }
+                }
+            }
+            return
+        }
         lastMove = now
         let p = Geo.flip(NSEvent.mouseLocation)
 
@@ -78,7 +91,7 @@ final class LayoutFlyout {
             return
         }
 
-        let under = windowUnder(p)
+        let under = WindowList.windowAt(p)
         guard let (wid, pid, bounds) = under,
               p.x < bounds.minX + 120, p.y < bounds.minY + 64,
               let button = greenButton(wid: wid, pid: pid, bounds: bounds),
@@ -114,23 +127,6 @@ final class LayoutFlyout {
         hoverTimer?.invalidate()
         hoverTimer = nil
         hoverWindow = 0
-    }
-
-    private func windowUnder(_ p: CGPoint) -> (CGWindowID, pid_t, CGRect)? {
-        let own = ProcessInfo.processInfo.processIdentifier
-        let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
-            as? [[String: Any]] ?? []
-        for w in info {
-            guard let b = w[kCGWindowBounds as String] as? NSDictionary,
-                  let bounds = CGRect(dictionaryRepresentation: b), bounds.contains(p) else { continue }
-            let layer = w[kCGWindowLayer as String] as? Int ?? 0
-            let alpha = w[kCGWindowAlpha as String] as? Double ?? 1
-            if layer != 0 || alpha == 0 { continue }
-            guard let id = w[kCGWindowNumber as String] as? CGWindowID,
-                  let pid = w[kCGWindowOwnerPID as String] as? pid_t, pid != own else { return nil }
-            return (id, pid, bounds)
-        }
-        return nil
     }
 
     /// The green button's frame, from Accessibility once per window position.

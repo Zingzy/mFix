@@ -78,28 +78,33 @@ final class Hotkeys {
     }
 }
 
-/// Listen-only tap on modifier changes, used to commit the switcher when Cmd goes up.
+/// A listen-only session event tap: sees every event of the given types on its way through
+/// WindowServer, including the mouse drags WindowServer runs itself for title-bar moves,
+/// which never reach an app and so never reach an NSEvent global monitor.
 /// Listen-only on purpose: an active tap hangs all input if Accessibility is revoked.
-final class ModifierWatch {
+final class ListenTap {
     private var tap: CFMachPort?
-    private let onChange: (CGEventFlags) -> Void
+    private let types: [CGEventType]
+    private let handler: (CGEventType, CGEvent) -> Void
 
-    init(onChange: @escaping (CGEventFlags) -> Void) {
-        self.onChange = onChange
+    init(_ types: [CGEventType], handler: @escaping (CGEventType, CGEvent) -> Void) {
+        self.types = types
+        self.handler = handler
     }
 
     @discardableResult
     func start() -> Bool {
         let me = Unmanaged.passUnretained(self).toOpaque()
+        let mask = types.reduce(CGEventMask(0)) { $0 | (1 << $1.rawValue) }
         guard let tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap, place: .headInsertEventTap, options: .listenOnly,
-            eventsOfInterest: CGEventMask(1 << CGEventType.flagsChanged.rawValue),
+            eventsOfInterest: mask,
             callback: { _, type, event, refcon in
-                let me = Unmanaged<ModifierWatch>.fromOpaque(refcon!).takeUnretainedValue()
+                let me = Unmanaged<ListenTap>.fromOpaque(refcon!).takeUnretainedValue()
                 if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
                     if let tap = me.tap { CGEvent.tapEnable(tap: tap, enable: true) }
                 } else {
-                    me.onChange(event.flags)
+                    me.handler(type, event)
                 }
                 return Unmanaged.passUnretained(event)
             },

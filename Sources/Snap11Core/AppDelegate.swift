@@ -2,7 +2,7 @@ import AppKit
 import Carbon.HIToolbox
 
 public final class AppDelegate: NSObject, NSApplicationDelegate {
-    private var modifierWatch: ModifierWatch?
+    private var modifierWatch: ListenTap?
     private var statusItem: NSStatusItem?
     /// Snap Assist waits for the chord's modifiers to go up, so holding them and pressing
     /// arrows steers the window first, as on Windows.
@@ -17,9 +17,11 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         setUpStatusItem()
         FocusHistory.shared.start()
         LayoutFlyout.shared.start()
+        DragSnap.shared.start()
         registerHotkeys()
         SkyLight.setSystemSwitcherEnabled(false)
-        modifierWatch = ModifierWatch { [weak self] flags in
+        modifierWatch = ListenTap([.flagsChanged]) { [weak self] _, event in
+            let flags = event.flags
             MainActor.assumeIsolated { self?.modifiersChanged(flags) }
         }
         let tapStarted = modifierWatch?.start() ?? false

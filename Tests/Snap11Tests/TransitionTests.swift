@@ -119,3 +119,35 @@ import Testing
         #expect(flow.size.height > box.height)
     }
 }
+
+@Suite struct DragZoneTests {
+    let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+    var one: [CGRect] { [screen] }
+
+    @Test func edgesAndCorners() {
+        #expect(dragZone(cursor: CGPoint(x: 0, y: 500), screen: screen, screens: one) == .left)
+        #expect(dragZone(cursor: CGPoint(x: 1511, y: 500), screen: screen, screens: one) == .right)
+        #expect(dragZone(cursor: CGPoint(x: 700, y: 0), screen: screen, screens: one) == .full)
+        #expect(dragZone(cursor: CGPoint(x: 0, y: 10), screen: screen, screens: one) == .topLeft)
+        #expect(dragZone(cursor: CGPoint(x: 10, y: 0), screen: screen, screens: one) == .topLeft)
+        #expect(dragZone(cursor: CGPoint(x: 1511, y: 975), screen: screen, screens: one) == .bottomRight)
+        #expect(dragZone(cursor: CGPoint(x: 0, y: 975), screen: screen, screens: one) == .bottomLeft)
+        #expect(dragZone(cursor: CGPoint(x: 700, y: 500), screen: screen, screens: one) == nil)
+        #expect(dragZone(cursor: CGPoint(x: 700, y: 981), screen: screen, screens: one) == nil)
+    }
+
+    @Test func sharedEdgeWithAnotherMonitorDoesNotSnap() {
+        let second = CGRect(x: 1512, y: 0, width: 1920, height: 1080)
+        #expect(dragZone(cursor: CGPoint(x: 1511, y: 500), screen: screen, screens: [screen, second]) == nil)
+        #expect(dragZone(cursor: CGPoint(x: 0, y: 500), screen: screen, screens: [screen, second]) == .left)
+    }
+
+    @Test func dragOutKeepsTheGrabPointUnderThePointer() {
+        let snapped = CGRect(x: 0, y: 33, width: 756, height: 890)
+        let f = dragOutFrame(current: snapped.offsetBy(dx: 40, dy: 20), restoreSize: CGSize(width: 600, height: 400),
+                             grab: CGPoint(x: 378, y: 45), grabbedFrame: snapped, cursor: CGPoint(x: 418, y: 65))
+        #expect(f.size == CGSize(width: 600, height: 400))
+        #expect(abs((418 - f.minX) / f.width - 0.5) < 0.01)
+        #expect(f.minY == 53)
+    }
+}
