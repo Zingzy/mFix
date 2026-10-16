@@ -107,6 +107,7 @@ private struct SwitcherTab: View {
     @AppStorage(Settings.K.switcher) private var switcher = true
     @AppStorage(Settings.K.allSpaces) private var allSpaces = true
     @AppStorage(Settings.K.showDelay) private var showDelay = 0.09
+    @AppStorage(Settings.K.liveThumbnails) private var liveThumbnails = true
 
     var body: some View {
         Form {
@@ -125,6 +126,11 @@ private struct SwitcherTab: View {
                 }
                 .disabled(!switcher)
                 Text("A quick Cmd+Tab under this delay switches without showing the panel.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Section {
+                Toggle("Live thumbnails", isOn: $liveThumbnails)
+                Text("While the switcher, Snap Assist or a Dock preview is open, windows on screen refresh three times a second. Nothing runs while they are closed.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }

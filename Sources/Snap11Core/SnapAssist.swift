@@ -50,6 +50,7 @@ final class SnapAssist {
     private var lastPicked: AXWindow?
     private var anchor: AXWindow?
     private var generation = 0
+    private let live = LiveThumbnails()
     private(set) var isOpen = false
 
     private init() {
@@ -156,10 +157,13 @@ final class SnapAssist {
         panel.show(frame: frame)
 
         let g = generation
-        Thumbnails.shared.capture(candidates, points: max(flow.frames.first?.width ?? 300, flow.frames.first?.height ?? 300)) { [weak self] id, image in
+        let onImage: (CGWindowID, CGImage) -> Void = { [weak self] id, image in
             guard let self, self.generation == g else { return }
             self.cards.first(where: { $0.target.id == id })?.setThumbnail(image)
         }
+        let side = max(flow.frames.first?.width ?? 300, flow.frames.first?.height ?? 300)
+        Thumbnails.shared.capture(candidates, points: side, onImage: onImage)
+        live.start(candidates, points: side, onImage: onImage)
     }
 
     private func updateRing() {
@@ -191,6 +195,7 @@ final class SnapAssist {
         guard isOpen else { return }
         isOpen = false
         generation += 1
+        live.stop()
         queue = []
         zone = nil
         panel.hide()

@@ -20,6 +20,7 @@ final class DockPreview {
     private var shownFor: URL?
     private var cards: [WindowCard] = []
     private var generation = 0
+    private let live = LiveThumbnails()
     private var clickTap: ListenTap?
     private var down: (url: URL, wasFront: Bool, at: CGPoint)?
 
@@ -153,10 +154,13 @@ final class DockPreview {
         scheduleHide()
 
         let g = generation
-        Thumbnails.shared.capture(windows, points: max(flow.frames.first?.width ?? 200, 200)) { [weak self] id, image in
+        let onImage: (CGWindowID, CGImage) -> Void = { [weak self] id, image in
             guard let self, self.generation == g else { return }
             self.cards.first(where: { $0.target.id == id })?.setThumbnail(image)
         }
+        let side = max(flow.frames.first?.width ?? 200, 200)
+        Thumbnails.shared.capture(windows, points: side, onImage: onImage)
+        live.start(windows, points: side, onImage: onImage)
     }
 
     private func scheduleHide() {
@@ -178,6 +182,7 @@ final class DockPreview {
         hideTimer = nil
         shownFor = nil
         generation += 1
+        live.stop()
         panel.hide()
         cards = []
     }

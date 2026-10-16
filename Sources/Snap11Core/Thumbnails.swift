@@ -34,11 +34,17 @@ final class Thumbnails {
 
     /// Calls back per window as images arrive, so cards show the cached image first and
     /// swap in the fresh one. `points` is the card's long side.
-    func capture(_ windows: [AXWindow], points: CGFloat, onImage: @escaping (CGWindowID, CGImage) -> Void) {
+    func capture(_ windows: [AXWindow], points: CGFloat, done: (() -> Void)? = nil, onImage: @escaping (CGWindowID, CGImage) -> Void) {
         let ids = windows.map(\.id)
         let offscreen = Set(windows.filter { $0.isMinimized || ($0.app?.isHidden ?? false) }.map(\.id))
         Task { @MainActor in
             let known = await scWindows(for: ids.filter { !offscreen.contains($0) })
+            var pending = 0
+            func finished() {
+                pending -= 1
+                if pending == 0 { done?() }
+            }
+            pending += 1
             for id in ids {
                 // ScreenCaptureKit only captures windows on screen; minimized, hidden and
                 // other-Space windows go through the private capture.
@@ -59,16 +65,21 @@ final class Thumbnails {
                 config.showsCursor = false
                 config.ignoreShadows = true
                 let filter = SCContentFilter(desktopIndependentWindow: window)
+                pending += 1
                 SCScreenshotManager.captureScreenshot(contentFilter: filter, configuration: config) { output, _ in
-                    guard let image = output?.sdrImage else { return }
+                    let image = output?.sdrImage
                     DispatchQueue.main.async {
                         MainActor.assumeIsolated {
-                            Thumbnails.shared.cache[id] = image
-                            onImage(id, image)
+                            if let image {
+                                Thumbnails.shared.cache[id] = image
+                                onImage(id, image)
+                            }
+                            finished()
                         }
                     }
                 }
             }
+            finished()
         }
     }
 }

@@ -54,6 +54,7 @@ final class Switcher {
     private var dragHoverTimer: Timer?
     private var dragHoverIndex: Int?
     private var generation = 0
+    private let live = LiveThumbnails()
     private(set) var isOpen = false
 
     private init() {
@@ -187,7 +188,7 @@ final class Switcher {
         let members = groupOf.values.flatMap(\.members)
         let everyone = windows + members.filter { m in !windows.contains(m) }
         for (lead, group) in groupOf { composeGroup(lead, group) }
-        Thumbnails.shared.capture(everyone, points: max(flow.frames.first?.width ?? 300, flow.frames.first?.height ?? 300)) { [weak self] id, image in
+        let onImage: (CGWindowID, CGImage) -> Void = { [weak self] id, image in
             guard let self, self.generation == g else { return }
             if let (lead, group) = self.groupOf.first(where: { $0.value.members.contains { $0.id == id } }) {
                 self.composeGroup(lead, group)
@@ -195,6 +196,9 @@ final class Switcher {
                 self.cards.first(where: { $0.target.id == id })?.setThumbnail(image)
             }
         }
+        let side = max(flow.frames.first?.width ?? 300, flow.frames.first?.height ?? 300)
+        Thumbnails.shared.capture(everyone, points: side, onImage: onImage)
+        live.start(everyone, points: side, onImage: onImage)
     }
 
     /// The group card's picture: the screen's wallpaper with each member's thumbnail where
@@ -281,6 +285,7 @@ final class Switcher {
     func cancel() { close() }
 
     private func close() {
+        live.stop()
         Hotkeys.shared.stopRepeating()
         dragEnded()
         isOpen = false
