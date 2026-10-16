@@ -162,3 +162,18 @@ import Testing
         #expect(FinderZoom.stage(view: "clvw", iconSize: 64) == 4)
     }
 }
+
+@MainActor
+@Suite struct WindowCycleTests {
+    @Test func visitsEveryWindowEvenThoughFocusReordersTheList() {
+        let all = (1...3).map { AXWindow(offSpace: CGWindowID($0), pid: 42, title: "w\($0)", frame: .zero) }
+        var mru = all
+        var visited: [CGWindowID] = []
+        for _ in 0..<3 {
+            guard let next = WindowCycle.next(of: mru, pid: 42) else { break }
+            visited.append(next.id)
+            mru = [next] + mru.filter { $0 != next }
+        }
+        #expect(visited == [2, 3, 1])
+    }
+}

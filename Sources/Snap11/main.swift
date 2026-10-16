@@ -26,6 +26,8 @@ if let i = args.firstIndex(of: "--render"), args.count > i + 1 {
     }
 } else if args.contains("--finder-probe") {
     MainActor.assumeIsolated { FinderProbe.run() }
+} else if let i = args.firstIndex(of: "--dock-check"), args.count > i + 1, let pid = pid_t(args[i + 1]) {
+    MainActor.assumeIsolated { DockCheck.run(snap11: pid) }
 } else if args.contains("--finder-check") {
     MainActor.assumeIsolated { FinderCheck.run() }
 } else if args.contains("--minimize-check") {

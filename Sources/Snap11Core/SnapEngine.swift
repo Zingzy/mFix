@@ -54,6 +54,10 @@ final class SnapEngine {
         }
         let work = Geo.workArea(screen)
         let target = zone.frame(in: work)
+        // Snapping a member somewhere else takes it out of its group; Snap Assist and
+        // suggested layouts put it back in right after.
+        SnapGroups.shared.leave(window)
+        SnapGroups.shared.settle(window.id)
         window.setFrame(target)
         var actual = window.frame
         if !work.contains(actual) && actual.width <= work.width && actual.height <= work.height {
@@ -66,6 +70,7 @@ final class SnapEngine {
     }
 
     func restore(_ window: AXWindow) {
+        SnapGroups.shared.leave(window)
         guard let r = records.removeValue(forKey: window.id) else { return }
         var target = r.restore
         let screen = Geo.screen(containing: window.frame)
@@ -84,11 +89,23 @@ final class SnapEngine {
 
     func forget(_ window: AXWindow) { records[window.id] = nil }
 
+    /// A snapped window resized in place (its group's divider, or its edge): it stays
+    /// arranged at its new size and keeps its restore frame.
+    func adopt(_ window: AXWindow) {
+        guard var r = records[window.id] else { return }
+        let frame = window.frame
+        let screen = Geo.screen(containing: frame)
+        r.lastSet = frame
+        r.zone = Zone.from(frame: frame, in: Geo.workArea(screen))
+        records[window.id] = r
+    }
+
     /// Dragging a snapped or maximized window out of place: hands back its restore frame and
     /// forgets the snap, if Snap11 put it at `frame`.
     func takeRestoreFrame(for window: AXWindow, snappedAt frame: CGRect) -> CGRect? {
         guard let r = records[window.id], r.lastSet.isClose(to: frame, tolerance: 2) else { return nil }
         records[window.id] = nil
+        SnapGroups.shared.leave(window)
         return r.restore
     }
 

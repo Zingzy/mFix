@@ -54,8 +54,7 @@ enum DockApps {
                 current.minimize()
                 return
             }
-            let i = visible.firstIndex(of: current) ?? 0
-            let next = visible[(i + 1) % visible.count]
+            guard let next = WindowCycle.next(of: visible, pid: app.processIdentifier) else { return }
             next.focus()
             FocusHistory.shared.touch(next.id)
             return

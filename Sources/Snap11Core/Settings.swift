@@ -23,6 +23,8 @@ enum Settings {
         static let finderZoom = "finder.zoom"
         static let dockPreviews = "dock.previews"
         static let dockClicks = "dock.clicks"
+        static let dockDelay = "dock.delay"
+        static let snapGroups = "snap.groups"
     }
 
     static func register() {
@@ -45,6 +47,8 @@ enum Settings {
             K.finderZoom: true,
             K.dockPreviews: true,
             K.dockClicks: true,
+            K.dockDelay: 0.25,
+            K.snapGroups: true,
         ])
     }
 
@@ -67,6 +71,8 @@ enum Settings {
     static var finderZoom: Bool { d.bool(forKey: K.finderZoom) }
     static var dockPreviews: Bool { d.bool(forKey: K.dockPreviews) }
     static var dockClicks: Bool { d.bool(forKey: K.dockClicks) }
+    static var dockDelay: TimeInterval { d.double(forKey: K.dockDelay) }
+    static var snapGroups: Bool { d.bool(forKey: K.snapGroups) }
 
     /// Launch at login lives with the system, not in UserDefaults.
     static var launchAtLogin: Bool {

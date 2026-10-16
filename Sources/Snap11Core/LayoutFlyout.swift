@@ -235,11 +235,14 @@ final class LayoutFlyout {
         close()
         if layout.isSuggestion {
             let windows = WindowList.currentSpace()
+            var placed: [AXWindow] = []
             for (i, id) in layout.suggested.enumerated() {
                 guard let id, let w = (id == target.id ? target : windows.first(where: { $0.id == id })) else { continue }
                 if w.isMinimized { w.unminimize() }
                 SnapEngine.shared.place(w, zone: layout.zones[i], on: screen)
+                if w != target { placed.append(w) }
             }
+            if Settings.snapGroups { SnapGroups.shared.join(placed, with: target, on: screen) }
             target.focus()
             return
         }

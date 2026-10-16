@@ -8,8 +8,6 @@ import AppKit
 final class DockPreview {
     static let shared = DockPreview()
 
-    /// Windows shows taskbar thumbnails after a short rest on the button.
-    private let showDelay: TimeInterval = 0.25
 
     private let panel = OverlayPanel(takesKeyboard: false)
     private var observer: AXObserver?
@@ -83,11 +81,9 @@ final class DockPreview {
         }
         hovered = (CGRect(origin: pos, size: size), url)
         if Hotkeys.debug { NSLog("Snap11: dock hover %@", url.lastPathComponent) }
-        hideTimer?.invalidate()
-        hideTimer = nil
         if shownFor == url { return }
         showTimer?.invalidate()
-        let wait = panel.isVisible ? 0 : showDelay
+        let wait = panel.isVisible ? 0 : Settings.dockDelay
         showTimer = Timer.scheduledTimer(withTimeInterval: wait, repeats: false) { [weak self] _ in
             MainActor.assumeIsolated { self?.show() }
         }
@@ -135,14 +131,15 @@ final class DockPreview {
         }
         root.addSubview(content)
 
-        // Above the icon for a bottom Dock, beside it for a side Dock, kept on screen.
+        // Right against the icon, covering the Dock's own name label, which otherwise stays
+        // on screen over the cards. Above it for a bottom Dock, beside it for a side Dock.
         let iconApp = Geo.flip(icon)
         let visible = screen.frame.insetBy(dx: 8, dy: 8)
         var origin: CGPoint
         switch DockEdge.current {
-        case .bottom: origin = CGPoint(x: iconApp.midX - size.width / 2, y: iconApp.maxY + 6)
-        case .left: origin = CGPoint(x: iconApp.maxX + 6, y: iconApp.midY - size.height / 2)
-        case .right: origin = CGPoint(x: iconApp.minX - 6 - size.width, y: iconApp.midY - size.height / 2)
+        case .bottom: origin = CGPoint(x: iconApp.midX - size.width / 2, y: iconApp.maxY + 2)
+        case .left: origin = CGPoint(x: iconApp.maxX + 2, y: iconApp.midY - size.height / 2)
+        case .right: origin = CGPoint(x: iconApp.minX - 2 - size.width, y: iconApp.midY - size.height / 2)
         }
         origin.x = min(max(origin.x, visible.minX), visible.maxX - size.width)
         origin.y = min(max(origin.y, visible.minY), visible.maxY - size.height)
@@ -150,6 +147,10 @@ final class DockPreview {
         panel.contentView = root
         panel.appearance = Theme.appearance
         panel.show(frame: NSRect(origin: origin, size: size))
+        // The Dock doesn't always report the pointer leaving, so the panel watches for it.
+        hideTimer?.invalidate()
+        hideTimer = nil
+        scheduleHide()
 
         let g = generation
         Thumbnails.shared.capture(windows, points: max(flow.frames.first?.width ?? 200, 200)) { [weak self] id, image in
@@ -202,10 +203,7 @@ final class DockPreview {
                 let windows = WindowList.currentSpace().filter { $0.pid == app.processIdentifier && !$0.isMinimized }
                 if windows.count == 1 {
                     windows[0].minimize()
-                } else if windows.count > 1 {
-                    let focused = AXWindow.focused()
-                    let i = focused.flatMap { windows.firstIndex(of: $0) } ?? 0
-                    let next = windows[(i + 1) % windows.count]
+                } else if let next = WindowCycle.next(of: windows, pid: app.processIdentifier) {
                     next.focus()
                     FocusHistory.shared.touch(next.id)
                 }

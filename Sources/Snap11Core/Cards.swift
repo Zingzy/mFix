@@ -52,7 +52,11 @@ final class WindowCard: FlippedView {
     private let closeButton = CloseButton()
     private var tracking: NSTrackingArea?
 
-    init(window: AXWindow, stripHeight: CGFloat, fontSize: CGFloat) {
+    /// A snap group shows every member's icon and a "Group | …" title instead.
+    private var extraIcons: [NSImageView] = []
+    var closable = true
+
+    init(window: AXWindow, stripHeight: CGFloat, fontSize: CGFloat, title custom: String? = nil, icons: [NSImage] = []) {
         self.target = window
         self.stripHeight = stripHeight
         super.init(frame: .zero)
@@ -74,7 +78,15 @@ final class WindowCard: FlippedView {
         strip.addSubview(iconView)
 
         let title = window.title.isEmpty ? (app?.localizedName ?? "") : window.title
-        titleField.stringValue = title
+        titleField.stringValue = custom ?? title
+        for icon in icons.dropFirst() {
+            let v = NSImageView()
+            v.image = icon
+            v.imageScaling = .scaleProportionallyUpOrDown
+            strip.addSubview(v)
+            extraIcons.append(v)
+        }
+        if let first = icons.first { iconView.image = first }
         titleField.font = .systemFont(ofSize: fontSize)
         titleField.textColor = Theme.text
         titleField.lineBreakMode = .byTruncatingTail
@@ -113,10 +125,15 @@ final class WindowCard: FlippedView {
         let iconSize = (s * 0.4).rounded()
         strip.frame = CGRect(x: 0, y: 0, width: bounds.width, height: s)
         iconView.frame = CGRect(x: pad, y: (s - iconSize) / 2, width: iconSize, height: iconSize)
+        var lastIcon = iconView.frame
+        for v in extraIcons {
+            v.frame = lastIcon.offsetBy(dx: iconSize + 4, dy: 0)
+            lastIcon = v.frame
+        }
         let closeSize = s * 0.7
         closeButton.frame = CGRect(x: bounds.width - closeSize - (s - closeSize) / 2, y: (s - closeSize) / 2,
                                    width: closeSize, height: closeSize)
-        let titleX = iconView.frame.maxX + pad * 0.66
+        let titleX = lastIcon.maxX + pad * 0.66
         let titleRight = closeButton.isHidden ? bounds.width - pad : closeButton.frame.minX - 4
         let textHeight = titleField.intrinsicContentSize.height
         titleField.frame = CGRect(x: titleX, y: (s - textHeight) / 2, width: max(0, titleRight - titleX), height: textHeight)
@@ -137,7 +154,7 @@ final class WindowCard: FlippedView {
     }
 
     override func mouseEntered(with event: NSEvent) {
-        closeButton.isHidden = !target.hasElement
+        closeButton.isHidden = !target.hasElement || !closable
         strip.layer?.backgroundColor = Theme.stripHover.cgColor
         needsLayout = true
         onHover?()

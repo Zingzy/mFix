@@ -43,6 +43,9 @@ final class Switcher {
     }()
 
     var windows: [AXWindow] = []
+    /// A snap group stands in the list as its most recent member; this maps that member to
+    /// the group, whose other members are left out of the list.
+    private var groupOf: [CGWindowID: SnapGroups.Group] = [:]
     private var cards: [WindowCard] = []
     private var flow = CardFlow()
     private var selected = 0
@@ -69,7 +72,7 @@ final class Switcher {
             move(backward ? -1 : 1)
             return
         }
-        windows = Settings.allSpaces ? WindowList.allSpaces() : WindowList.currentSpace()
+        windows = collapseGroups(Settings.allSpaces ? WindowList.allSpaces() : WindowList.currentSpace())
         if Hotkeys.debug { NSLog("Snap11: switcher windows %d", windows.count) }
         guard !windows.isEmpty else { return }
         isOpen = true
@@ -97,6 +100,30 @@ final class Switcher {
         commit()
     }
 
+    private func collapseGroups(_ list: [AXWindow]) -> [AXWindow] {
+        groupOf = [:]
+        guard Settings.snapGroups else { return list }
+        let present = Set(list.filter { !$0.isMinimized }.map(\.id))
+        var seen: [ObjectIdentifier] = []
+        var out: [AXWindow] = []
+        for w in list {
+            guard let g = SnapGroups.shared.group(containing: w.id), g.members.allSatisfy({ present.contains($0.id) }) else {
+                out.append(w)
+                continue
+            }
+            if seen.contains(ObjectIdentifier(g)) { continue }
+            seen.append(ObjectIdentifier(g))
+            groupOf[w.id] = g
+            out.append(w)
+        }
+        return out
+    }
+
+    private func screenAspect(_ g: SnapGroups.Group) -> CGFloat {
+        let s = NSScreen.screens.first { $0.displayID == g.screenID } ?? NSScreen.screens[0]
+        return s.frame.width / s.frame.height
+    }
+
     private func move(_ delta: Int) {
         guard !windows.isEmpty else { return }
         selected = (selected + delta + windows.count) % windows.count
@@ -111,14 +138,24 @@ final class Switcher {
         let pad: CGFloat = 56
         let box = CGSize(width: sf.width * 0.92 - pad * 2, height: sf.height * 0.9 - pad * 2)
         // Windows shrinks the cards as windows pile up, down to a floor, then scrolls.
-        flow = CardFlow.fit(aspects: windows.map(CardFlow.aspect), box: box,
+        flow = CardFlow.fit(aspects: windows.map { groupOf[$0.id].map(screenAspect) ?? CardFlow.aspect(of: $0) }, box: box,
                             minHeight: (sf.height * 0.1).rounded(), maxHeight: (sf.height * 0.266).rounded(),
                             strip: 40, gap: CGSize(width: 26, height: 26), scaled: true)
         let strip = flow.strip
 
         cards.forEach { $0.removeFromSuperview() }
         cards = windows.enumerated().map { i, w in
-            let card = WindowCard(window: w, stripHeight: strip, fontSize: strip < 34 ? 11 : 12)
+            let card: WindowCard
+            if let g = groupOf[w.id] {
+                let name = w.title.isEmpty ? (w.app?.localizedName ?? "") : w.title
+                let others = g.members.count - 1
+                card = WindowCard(window: w, stripHeight: strip, fontSize: strip < 34 ? 11 : 12,
+                                  title: "Group | \(name) and \(others) other window\(others == 1 ? "" : "s")",
+                                  icons: g.members.compactMap { $0.app?.icon })
+                card.closable = false
+            } else {
+                card = WindowCard(window: w, stripHeight: strip, fontSize: strip < 34 ? 11 : 12)
+            }
             card.frame = flow.frames[i].offsetBy(dx: pad, dy: pad)
             card.onClick = { [weak self] in self?.selected = i; self?.commit() }
             card.onClose = { [weak self] in self?.closeWindow(at: i) }
@@ -147,10 +184,40 @@ final class Switcher {
         panel.show(frame: frame)
 
         let g = generation
-        Thumbnails.shared.capture(windows, points: max(flow.frames.first?.width ?? 300, flow.frames.first?.height ?? 300)) { [weak self] id, image in
+        let members = groupOf.values.flatMap(\.members)
+        let everyone = windows + members.filter { m in !windows.contains(m) }
+        for (lead, group) in groupOf { composeGroup(lead, group) }
+        Thumbnails.shared.capture(everyone, points: max(flow.frames.first?.width ?? 300, flow.frames.first?.height ?? 300)) { [weak self] id, image in
             guard let self, self.generation == g else { return }
-            self.cards.first(where: { $0.target.id == id })?.setThumbnail(image)
+            if let (lead, group) = self.groupOf.first(where: { $0.value.members.contains { $0.id == id } }) {
+                self.composeGroup(lead, group)
+            } else {
+                self.cards.first(where: { $0.target.id == id })?.setThumbnail(image)
+            }
         }
+    }
+
+    /// The group card's picture: the screen's wallpaper with each member's thumbnail where
+    /// the member sits, like Windows' snap group thumbnails.
+    private func composeGroup(_ lead: CGWindowID, _ g: SnapGroups.Group) {
+        guard let card = cards.first(where: { $0.target.id == lead }) else { return }
+        let screen = NSScreen.screens.first { $0.displayID == g.screenID } ?? NSScreen.screens[0]
+        let sf = Geo.flip(screen.frame)
+        let w = 640, h = Int(640 / (sf.width / sf.height))
+        guard let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0,
+                                  space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+        else { return }
+        let scale = CGFloat(w) / sf.width
+        ctx.setFillColor(Theme.thumbBackground.cgColor)
+        ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
+        if let wall = Wallpaper.image(for: screen) { ctx.draw(wall, in: CGRect(x: 0, y: 0, width: w, height: h)) }
+        for m in g.members.reversed() {
+            guard let image = Thumbnails.shared.cached(m.id), let f = g.frames[m.id] else { continue }
+            let r = CGRect(x: (f.minX - sf.minX) * scale, y: CGFloat(h) - (f.maxY - sf.minY) * scale,
+                           width: f.width * scale, height: f.height * scale)
+            ctx.draw(image, in: r)
+        }
+        if let image = ctx.makeImage() { card.setThumbnail(image) }
     }
 
     private func updateRing() {
@@ -199,6 +266,13 @@ final class Switcher {
         guard isOpen, windows.indices.contains(selected) else { cancel(); return }
         let target = windows[selected]
         if Hotkeys.debug { NSLog("Snap11: switch to %d of %d: %@ (%u)", selected, windows.count, target.app?.localizedName ?? "?", target.id) }
+        if let g = groupOf[target.id] {
+            // The whole group comes forward, the most recent member last so it ends on top.
+            for m in g.members where m != target {
+                m.focus()
+                FocusHistory.shared.touch(m.id)
+            }
+        }
         target.focus()
         FocusHistory.shared.touch(target.id)
         close()

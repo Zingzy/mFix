@@ -48,6 +48,7 @@ final class SnapAssist {
     private var zone: Zone?
     private var placed: Set<CGWindowID> = []
     private var lastPicked: AXWindow?
+    private var anchor: AXWindow?
     private var generation = 0
     private(set) var isOpen = false
 
@@ -69,6 +70,7 @@ final class SnapAssist {
         queue = zones
         placed = [window.id]
         lastPicked = window
+        anchor = window
         isOpen = true
         showNext()
     }
@@ -169,6 +171,7 @@ final class SnapAssist {
         let window = cards[i].target
         if window.isMinimized { window.unminimize() }
         SnapEngine.shared.place(window, zone: zone, on: screen)
+        if Settings.snapGroups, let anchor { SnapGroups.shared.join([window], with: anchor, on: screen) }
         placed.insert(window.id)
         lastPicked = window
         window.focus()

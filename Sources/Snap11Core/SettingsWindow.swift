@@ -77,12 +77,14 @@ private struct SnappingTab: View {
     @AppStorage(Settings.K.layoutsHover) private var layoutsHover = true
     @AppStorage(Settings.K.hoverDelay) private var hoverDelay = 0.6
     @AppStorage(Settings.K.dragSnap) private var dragSnap = true
+    @AppStorage(Settings.K.snapGroups) private var snapGroups = true
 
     var body: some View {
         Form {
             Section {
                 Toggle("When I snap a window, show what I can snap next to it", isOn: $snapAssist)
                 Toggle("Snap a window by dragging it to a screen edge or corner", isOn: $dragSnap)
+                Toggle("Group windows I snap together; resize them together and show the group in the switcher", isOn: $snapGroups)
             }
             Section {
                 Toggle("Show snap layouts when I hover over a window's green button", isOn: $layoutsHover)
@@ -131,11 +133,21 @@ private struct SwitcherTab: View {
 private struct DockTab: View {
     @AppStorage(Settings.K.dockPreviews) private var dockPreviews = true
     @AppStorage(Settings.K.dockClicks) private var dockClicks = true
+    @AppStorage(Settings.K.dockDelay) private var dockDelay = 0.25
 
     var body: some View {
         Form {
             Section {
                 Toggle("Show an app's windows when I hover its Dock icon", isOn: $dockPreviews)
+                LabeledContent("Hover delay") {
+                    HStack {
+                        Slider(value: $dockDelay, in: 0...0.8)
+                        Text("\(Int((dockDelay * 100).rounded()) * 10) ms").monospacedDigit().frame(width: 64, alignment: .trailing)
+                    }
+                }
+                .disabled(!dockPreviews)
+                Text("Windows waits 400 ms. Once one preview is open, moving to another icon switches at once.")
+                    .font(.caption).foregroundStyle(.secondary)
                 Toggle("Clicking the app I'm in minimizes it, or steps through its windows", isOn: $dockClicks)
             }
         }
