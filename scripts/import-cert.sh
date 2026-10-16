@@ -1,7 +1,7 @@
 #!/bin/bash
 # Usage: scripts/import-cert.sh <dir> >> "$GITHUB_ENV"
 # Imports SIGNING_CERT_P12 (base64) with SIGNING_CERT_PASSWORD into a throwaway keychain in
-# <dir> and prints the SNAP11_* settings scripts/build.sh signs with.
+# <dir> and prints the MFIX_* settings scripts/build.sh signs with.
 set -euo pipefail
 DIR="$1"
 KEYCHAIN="$DIR/signing.keychain-db"
@@ -24,6 +24,6 @@ if [ -z "$IDENTITY" ]; then
     echo "no code signing identity in SIGNING_CERT_P12" >&2
     exit 1
 fi
-echo "SNAP11_KEYCHAIN=$KEYCHAIN"
-echo "SNAP11_KEYCHAIN_PASSWORD=$PASSWORD"
-echo "SNAP11_SIGN_IDENTITY=$IDENTITY"
+echo "MFIX_KEYCHAIN=$KEYCHAIN"
+echo "MFIX_KEYCHAIN_PASSWORD=$PASSWORD"
+echo "MFIX_SIGN_IDENTITY=$IDENTITY"

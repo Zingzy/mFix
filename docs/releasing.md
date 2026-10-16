@@ -58,16 +58,16 @@ Paste the clipboard into the `SIGNING_CERT_P12` secret and the export password i
 
 | Variable | Default |
 |---|---|
-| `SNAP11_KEYCHAIN` | `~/Library/Keychains/snap11-signing.keychain-db` |
-| `SNAP11_KEYCHAIN_PASSWORD` | `snap11` |
-| `SNAP11_SIGN_IDENTITY` | The SHA-1 of the maintainer's local certificate |
-| `SNAP11_VERSION` | Unset, which keeps the version in `scripts/Info.plist` |
+| `MFIX_KEYCHAIN` | `~/Library/Keychains/mfix-signing.keychain-db` |
+| `MFIX_KEYCHAIN_PASSWORD` | `mfix` |
+| `MFIX_SIGN_IDENTITY` | The SHA-1 of the maintainer's local certificate |
+| `MFIX_VERSION` | Unset, which keeps the version in `scripts/Info.plist` |
 
 If the keychain file doesn't exist, the build is signed ad hoc. The keychain has to be on your search list (`security list-keychains -d user -s ...`), because `codesign` only looks there. `scripts/import-cert.sh` does all of this for CI from the two secrets.
 
 Check what a build was signed with:
 
 ```sh
-codesign -dv --verbose=4 build/Snap11.app 2>&1 | grep Authority
-codesign -d -r- build/Snap11.app
+codesign -dv --verbose=4 build/mFix.app 2>&1 | grep Authority
+codesign -d -r- build/mFix.app
 ```

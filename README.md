@@ -210,8 +210,8 @@ You need macOS 26 and Xcode 26, for the macOS 26 SDK.
 ```sh
 swift build
 swift test
-scripts/build.sh     # build/Snap11.app
-scripts/dmg.sh       # build/Snap11.dmg
+scripts/build.sh     # build/mFix.app
+scripts/dmg.sh       # build/mFix.dmg
 ```
 
 `scripts/build.sh` signs ad hoc unless it finds a signing certificate. An ad hoc build gets a new signature every time, so macOS asks for the permissions again after each rebuild. [docs/releasing.md](docs/releasing.md) shows how to sign with a stable certificate. [CONTRIBUTING.md](CONTRIBUTING.md) covers the in-process checks.

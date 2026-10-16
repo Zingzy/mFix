@@ -33,7 +33,7 @@ jobs:
             echo "::error::Tag $GITHUB_REF_NAME is not vMAJOR.MINOR.PATCH, which CFBundleVersion needs."
             exit 1
           fi
-          echo "SNAP11_VERSION=$version" >> "$GITHUB_ENV"
+          echo "MFIX_VERSION=$version" >> "$GITHUB_ENV"
       - name: Import the signing certificate
         env:
           SIGNING_CERT_P12: ${{ secrets.SIGNING_CERT_P12 }}
@@ -49,8 +49,8 @@ jobs:
       - name: Name the assets and write checksums
         run: |
           mkdir dist
-          cp build/Snap11.dmg dist/mFix.dmg
-          ditto -c -k --keepParent build/Snap11.app dist/mFix.zip
+          cp build/mFix.dmg dist/mFix.dmg
+          ditto -c -k --keepParent build/mFix.app dist/mFix.zip
           cd dist
           shasum -a 256 mFix.dmg mFix.zip > SHA256SUMS.txt
           cat SHA256SUMS.txt
@@ -59,8 +59,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes --title "mFix $SNAP11_VERSION" \
+          gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes --title "mFix $MFIX_VERSION" \
             dist/mFix.dmg dist/mFix.zip dist/SHA256SUMS.txt
       - name: Remove the signing keychain
-        if: always() && env.SNAP11_KEYCHAIN != ''
-        run: security delete-keychain "$SNAP11_KEYCHAIN"
+        if: always() && env.MFIX_KEYCHAIN != ''
+        run: security delete-keychain "$MFIX_KEYCHAIN"

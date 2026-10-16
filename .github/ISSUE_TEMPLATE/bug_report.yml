@@ -63,5 +63,5 @@ body:
     id: logs
     attributes:
       label: Log
-      description: Optional. Quit mFix, start it with `open --env SNAP11_DEBUG=1 --stderr /tmp/mfix.log /Applications/mFix.app`, reproduce the bug and paste the end of /tmp/mfix.log. It lists app names and window titles, so check it first.
+      description: Optional. Quit mFix, start it with `open --env MFIX_DEBUG=1 --stderr /tmp/mfix.log /Applications/mFix.app`, reproduce the bug and paste the end of /tmp/mfix.log. It lists app names and window titles, so check it first.
       render: text

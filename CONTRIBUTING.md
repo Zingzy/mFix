@@ -9,8 +9,8 @@ You need macOS 26 and Xcode 26. The code calls ScreenCaptureKit API that only th
 ```sh
 swift build
 swift test
-scripts/build.sh     # build/Snap11.app, signed
-scripts/dmg.sh       # build/Snap11.dmg
+scripts/build.sh     # build/mFix.app, signed
+scripts/dmg.sh       # build/mFix.dmg
 ```
 
 `scripts/build.sh` signs ad hoc unless you have a signing certificate set up. Each ad hoc build has a new signature, so macOS asks for Accessibility and Screen Recording again after every rebuild. A self-signed certificate fixes that. See [docs/releasing.md](docs/releasing.md).
@@ -19,10 +19,10 @@ scripts/dmg.sh       # build/Snap11.dmg
 
 Only run one copy of mFix at a time. Two copies fight over Cmd+Tab and over the saved state of the system shortcuts they turn off. Quit the installed app before you run your build.
 
-Run the app from `build/Snap11.app`, not straight from `.build/`, so the permissions you grant stick to the signed bundle. `SNAP11_DEBUG=1` logs hotkeys, flags and focus changes:
+Run the app from `build/mFix.app`, not straight from `.build/`, so the permissions you grant stick to the signed bundle. `MFIX_DEBUG=1` logs hotkeys, flags and focus changes:
 
 ```sh
-open --env SNAP11_DEBUG=1 --stderr /tmp/mfix.log build/Snap11.app
+open --env MFIX_DEBUG=1 --stderr /tmp/mfix.log build/mFix.app
 ```
 
 The binary refuses any `--` flag it doesn't know and exits with status 64. That keeps a typo from starting a second copy of the app.
@@ -43,7 +43,7 @@ The rest of mFix is about real windows, so there are also checks built into the 
 | `--render <dir>` | Builds the switcher, Snap Assist, the layouts flyout and the settings tabs off screen and writes them as PNGs. They show your real windows. |
 | `--live-bench` | Measures the CPU and memory cost of live thumbnails. |
 
-Run them from the debug build, for example `.build/debug/Snap11 --snap-check`. `--pin-check` also waits for an idle Mac first. `SNAP11_CHECK_NOW=1` skips that wait.
+Run them from the debug build, for example `.build/debug/mFix --snap-check`. `--pin-check` also waits for an idle Mac first. `MFIX_CHECK_NOW=1` skips that wait.
 
 ### Checks that post input
 
