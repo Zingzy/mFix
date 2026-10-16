@@ -140,7 +140,7 @@ final class Switcher {
         // Windows shrinks the cards as windows pile up, down to a floor, then scrolls.
         flow = CardFlow.fit(aspects: windows.map { groupOf[$0.id].map(screenAspect) ?? CardFlow.aspect(of: $0) }, box: box,
                             minHeight: (sf.height * 0.1).rounded(), maxHeight: (sf.height * 0.266).rounded(),
-                            strip: 40, gap: CGSize(width: 26, height: 26), scaled: true)
+                            strip: 40, gap: CGSize(width: 26, height: 26), scaled: true, maxRows: 2)
         let strip = flow.strip
 
         cards.forEach { $0.removeFromSuperview() }

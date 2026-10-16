@@ -51,7 +51,9 @@ final class Thumbnails {
                 }
                 let window = known[id]!
                 let config = SCScreenshotConfiguration()
-                let scale = min(1, points / max(window.frame.width, window.frame.height, 1)) * 2
+                // Sharp on this display's real pixel ratio, whatever the Displays scaling.
+                let backing = NSScreen.screens.first { Geo.flip($0.frame).intersects(window.frame) }?.backingScaleFactor ?? 2
+                let scale = min(1, points / max(window.frame.width, window.frame.height, 1)) * backing
                 config.width = max(1, Int(window.frame.width * scale))
                 config.height = max(1, Int(window.frame.height * scale))
                 config.showsCursor = false

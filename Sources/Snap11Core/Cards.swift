@@ -311,8 +311,21 @@ struct CardFlow {
     /// The largest card height between `minHeight` and `maxHeight` whose flow fits `box`.
     /// When even `minHeight` overflows, the flow at `minHeight` comes back taller than `box`
     /// and the caller scrolls. Pass `scaled` to shrink the strip and gaps with the cards.
+    /// `maxRows`: shrink the cards to stay within this many rows, and only add rows once the
+    /// cards are at `minHeight`. Windows' switcher keeps seven windows in two rows.
     static func fit(aspects: [CGFloat], box: CGSize, minHeight: CGFloat, maxHeight: CGFloat, strip: CGFloat, gap: CGSize,
-                    scaled: Bool = false) -> CardFlow {
+                    scaled: Bool = false, maxRows: Int = .max) -> CardFlow {
+        if maxRows < .max {
+            let limited = fit(aspects: aspects, box: box, minHeight: minHeight, maxHeight: maxHeight, strip: strip, gap: gap,
+                              scaled: scaled, rows: maxRows)
+            if let limited { return limited }
+        }
+        return fit(aspects: aspects, box: box, minHeight: minHeight, maxHeight: maxHeight, strip: strip, gap: gap,
+                   scaled: scaled, rows: .max) ?? layout(aspects: aspects, cardHeight: minHeight, strip: strip, gap: gap, maxWidth: box.width)
+    }
+
+    private static func fit(aspects: [CGFloat], box: CGSize, minHeight: CGFloat, maxHeight: CGFloat, strip: CGFloat, gap: CGSize,
+                            scaled: Bool, rows maxRows: Int) -> CardFlow? {
         func at(_ h: CGFloat) -> CardFlow {
             let s = scaled ? CardFlow.strip(for: h) : strip
             let g = scaled ? CGSize(width: CardFlow.gap(for: h), height: CardFlow.gap(for: h)) : gap
@@ -320,13 +333,15 @@ struct CardFlow {
             f.strip = s
             return f
         }
+        func ok(_ f: CardFlow) -> Bool { f.fits(box) && (f.rowOf.max() ?? 0) < maxRows }
         var lo = minHeight, hi = maxHeight
-        if at(maxHeight).fits(box) { return at(maxHeight) }
+        if ok(at(maxHeight)) { return at(maxHeight) }
+        guard ok(at(minHeight)) || maxRows == .max else { return nil }
         var best = at(minHeight)
         for _ in 0..<14 {
             let mid = (lo + hi) / 2
             let f = at(mid)
-            if f.size.height <= box.height && f.size.width <= box.width {
+            if ok(f) {
                 best = f
                 lo = mid
             } else {

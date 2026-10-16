@@ -19,6 +19,7 @@ final class SnapEngine {
     // MARK: State
 
     func state(of window: AXWindow) -> (SnapState, NSScreen) {
+        WindowAnimator.shared.finish(window)
         let frame = window.frame
         let screen = Geo.screen(containing: frame)
         let work = Geo.workArea(screen)
@@ -58,15 +59,20 @@ final class SnapEngine {
         // suggested layouts put it back in right after.
         SnapGroups.shared.leave(window)
         SnapGroups.shared.settle(window.id)
-        window.setFrame(target)
-        var actual = window.frame
-        if !work.contains(actual) && actual.width <= work.width && actual.height <= work.height {
-            actual.origin.x = min(max(actual.minX, work.minX), work.maxX - actual.width)
-            actual.origin.y = min(max(actual.minY, work.minY), work.maxY - actual.height)
-            window.setFrame(actual)
-            actual = window.frame
+        // Recorded at the target now so a key pressed mid-slide sees the window as snapped.
+        records[window.id] = Record(restore: restore, lastSet: target, zone: zone, screenID: screen.displayID)
+        WindowAnimator.shared.animate(window, to: target) { [weak self] landed in
+            var actual = landed
+            if !work.contains(actual) && actual.width <= work.width && actual.height <= work.height {
+                // The app kept a bigger minimum size than the zone; keep it on screen.
+                actual.origin.x = min(max(actual.minX, work.minX), work.maxX - actual.width)
+                actual.origin.y = min(max(actual.minY, work.minY), work.maxY - actual.height)
+                window.setFrame(actual)
+                actual = window.frame
+            }
+            self?.records[window.id]?.lastSet = actual
+            SnapGroups.shared.settle(window.id)
         }
-        records[window.id] = Record(restore: restore, lastSet: actual, zone: zone, screenID: screen.displayID)
     }
 
     func restore(_ window: AXWindow) {
@@ -79,7 +85,7 @@ final class SnapEngine {
             // The window crossed monitors while snapped: keep the restore size, centre it here.
             target.origin = CGPoint(x: work.midX - target.width / 2, y: work.midY - target.height / 2)
         }
-        window.setFrame(target)
+        WindowAnimator.shared.animate(window, to: target) { _ in }
     }
 
     func minimize(_ window: AXWindow) {

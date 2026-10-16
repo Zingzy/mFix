@@ -177,3 +177,21 @@ import Testing
         #expect(visited == [2, 3, 1])
     }
 }
+
+@Suite struct RowLimitTests {
+    @Test func sevenWindowsStayInTwoRows() {
+        let box = CGSize(width: 1279, height: 772)
+        let flow = CardFlow.fit(aspects: Array(repeating: 1.7, count: 7), box: box, minHeight: 98, maxHeight: 261,
+                                strip: 40, gap: CGSize(width: 26, height: 26), scaled: true, maxRows: 2)
+        #expect((flow.rowOf.max() ?? 0) == 1)
+        #expect(flow.fits(box))
+    }
+
+    @Test func manyWindowsGrowRowsOnlyAtTheFloor() {
+        let box = CGSize(width: 1279, height: 772)
+        let flow = CardFlow.fit(aspects: Array(repeating: 1.7, count: 30), box: box, minHeight: 98, maxHeight: 261,
+                                strip: 40, gap: CGSize(width: 26, height: 26), scaled: true, maxRows: 2)
+        #expect((flow.rowOf.max() ?? 0) >= 2)
+        #expect(flow.fits(box))
+    }
+}
