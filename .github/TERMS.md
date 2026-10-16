@@ -1,6 +1,6 @@
 # Terms of use
 
-mFix is free software under the [MIT License](LICENSE). It comes as is, with no warranty of any kind. You use it at your own risk.
+mFix is free software under the [MIT License](../LICENSE). It comes as is, with no warranty of any kind. You use it at your own risk.
 
 A few things to know before you do:
 

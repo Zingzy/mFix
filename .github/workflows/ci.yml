@@ -13,8 +13,35 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Code changed
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: diff
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [ -z "$BASE" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git diff --name-only "$BASE" HEAD | grep -qE '^(Sources/|Tests/|Package\.(swift|resolved)$|scripts/|\.github/workflows/)'; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
     name: Build and test
+    needs: changes
+    # A skipped job still satisfies the required check, so docs-only pull requests can merge.
+    if: needs.changes.outputs.code == 'true'
     runs-on: macos-26
     timeout-minutes: 20
     env:

@@ -1,6 +1,6 @@
 # mFix
 
-[![Release](https://img.shields.io/github/v/release/Zingzy/mFix)](https://github.com/Zingzy/mFix/releases/latest) [![Downloads](https://img.shields.io/github/downloads/Zingzy/mFix/total)](https://github.com/Zingzy/mFix/releases) [![CI](https://img.shields.io/github/actions/workflow/status/Zingzy/mFix/ci.yml?branch=main&label=CI)](https://github.com/Zingzy/mFix/actions/workflows/ci.yml) [![License](https://img.shields.io/github/license/Zingzy/mFix)](.github/LICENSE) ![macOS 26+](https://img.shields.io/badge/macOS-26%2B-000000?logo=apple&logoColor=white) ![Swift 6](https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white)
+[![Release](https://img.shields.io/github/v/release/Zingzy/mFix)](https://github.com/Zingzy/mFix/releases/latest) [![Downloads](https://img.shields.io/github/downloads/Zingzy/mFix/total)](https://github.com/Zingzy/mFix/releases) [![CI](https://img.shields.io/github/actions/workflow/status/Zingzy/mFix/ci.yml?branch=main&label=CI)](https://github.com/Zingzy/mFix/actions/workflows/ci.yml) [![License](https://img.shields.io/github/license/Zingzy/mFix)](LICENSE) ![macOS 26+](https://img.shields.io/badge/macOS-26%2B-000000?logo=apple&logoColor=white) ![Swift 6](https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white)
 
 mFix: the Mac, fixed.
 
@@ -222,4 +222,4 @@ mFix is not affiliated with, endorsed by or sponsored by Microsoft or Apple. Win
 
 ## License
 
-[MIT](.github/LICENSE)
+[MIT](LICENSE)
