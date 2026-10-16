@@ -44,7 +44,7 @@ public enum RenderCheck {
             let anchor = front.fullScreenButtonFrame ?? CGRect(x: 200, y: 40, width: 14, height: 14)
             LayoutFlyout.shared.open(for: front, anchor: anchor, keyboard: true)
         }
-        for tab in 0..<4 {
+        for tab in 0..<5 {
             let host = NSHostingView(rootView: SettingsView(tab: tab))
             host.frame = NSRect(x: 0, y: 0, width: 520, height: 440)
             let w = NSWindow(contentRect: host.frame, styleMask: [.titled], backing: .buffered, defer: false)

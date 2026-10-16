@@ -5,7 +5,7 @@ import AppKit
 /// resizing and adds only the crossing between the smallest icons and list view, which
 /// Finder never does. Talks to Finder through its scripting interface.
 @MainActor
-final class FinderZoom {
+public final class FinderZoom {
     static let shared = FinderZoom()
 
     enum Stage: Equatable {
@@ -17,7 +17,7 @@ final class FinderZoom {
 
     /// The stage a window is at: list for list, column and gallery views; for icon view,
     /// the stage nearest its icon size.
-    static func stage(view: String, iconSize: Int) -> Int {
+    public static func stage(view: String, iconSize: Int) -> Int {
         guard view == "icnv" else { return stages.count - 1 }
         let sizes = stages.compactMap { if case let .icons(s) = $0 { return s } else { return nil } }
         return sizes.indices.min { abs(sizes[$0] - iconSize) < abs(sizes[$1] - iconSize) } ?? 0
@@ -58,6 +58,7 @@ final class FinderZoom {
             return
         }
         pinch += delta
+        if Hotkeys.debug { NSLog("Snap11: finder pinch %.2f start %@", pinch, pinchStart.map { "\($0.view) \($0.size)" } ?? "none") }
         guard abs(pinch) > 0.25, let start = pinchStart else { return }
         if start.view != "icnv", pinch > 0 {
             Self.apply(.icons(32))
@@ -71,7 +72,9 @@ final class FinderZoom {
     }
 
     private func step(by delta: Int) {
-        guard let now = Self.read() else { return }
+        let read = Self.read()
+        if Hotkeys.debug { NSLog("Snap11: finder zoom step %d from %@", delta, read.map { "\($0.view) \($0.size)" } ?? "unreadable") }
+        guard let now = read else { return }
         let i = Self.stage(view: now.view, iconSize: now.size)
         let target = Self.stages[min(max(i + delta, 0), Self.stages.count - 1)]
         let current: Stage = now.view == "icnv" ? .icons(now.size) : .list
@@ -83,13 +86,13 @@ final class FinderZoom {
     private static func run(_ source: String) -> NSAppleEventDescriptor? {
         var error: NSDictionary?
         let result = NSAppleScript(source: source)?.executeAndReturnError(&error)
-        if let error, Hotkeys.debug { NSLog("Snap11: finder script: %@", error) }
+        if let error { NSLog("Snap11: finder script failed: %@", error) }
         return result
     }
 
     /// The front Finder window's view as its four-letter code (icnv, lsvw, clvw, flvw) and
     /// its icon view's icon size.
-    static func read() -> (view: String, size: Int)? {
+    public static func read() -> (view: String, size: Int)? {
         guard let r = run("""
             tell application "Finder"
                 if (count of Finder windows) is 0 then return {}

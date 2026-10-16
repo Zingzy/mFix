@@ -19,6 +19,11 @@ if let i = args.firstIndex(of: "--render"), args.count > i + 1 {
         print("no real input seen")
         exit(0)
     }
+} else if args.contains("--finder-zoom-read") {
+    MainActor.assumeIsolated {
+        print(FinderZoom.read().map { "view \($0.view) icon size \($0.size) stage \(FinderZoom.stage(view: $0.view, iconSize: $0.size))" } ?? "unreadable")
+        exit(0)
+    }
 } else if args.contains("--finder-probe") {
     MainActor.assumeIsolated { FinderProbe.run() }
 } else if args.contains("--finder-check") {

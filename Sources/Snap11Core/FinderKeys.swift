@@ -71,11 +71,16 @@ final class FinderKeys {
     private func handle(_ type: CGEventType, _ e: CGEvent) -> Bool {
         if e.getIntegerValueField(.eventSourceUserData) == FinderKeys.tag { return false }
         if type == .scrollWheel {
-            guard e.flags.intersection([.maskCommand, .maskShift, .maskAlternate, .maskControl]) == .maskCommand,
-                  let under = WindowList.windowAt(e.location),
-                  NSRunningApplication(processIdentifier: under.pid)?.bundleIdentifier == "com.apple.finder" else { return false }
+            guard e.flags.intersection([.maskCommand, .maskShift, .maskAlternate, .maskControl]) == .maskCommand else { return false }
+            let under = WindowList.windowAt(e.location)
+            let overFinder = under.flatMap { NSRunningApplication(processIdentifier: $0.pid)?.bundleIdentifier } == "com.apple.finder"
+            // A wheel notch fills the line field; a trackpad only the point field.
             let lines = e.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1)
-            return FinderZoom.shared.scroll(deltaY: lines)
+            let points = e.getDoubleValueField(.scrollWheelEventPointDeltaAxis1)
+            let delta = lines != 0 ? lines : points
+            if Hotkeys.debug { NSLog("Snap11: finder cmd+scroll lines %.2f points %.2f over finder %d", lines, points, overFinder ? 1 : 0) }
+            guard overFinder else { return false }
+            return FinderZoom.shared.scroll(deltaY: delta)
         }
         let code = e.getIntegerValueField(.keyboardEventKeycode)
         if type == .keyUp { return swallowedUps.remove(code) != nil }

@@ -31,7 +31,8 @@ struct SettingsView: View {
             GeneralTab().tabItem { Label("General", systemImage: "gearshape") }.tag(0)
             SnappingTab().tabItem { Label("Snapping", systemImage: "rectangle.split.2x2") }.tag(1)
             SwitcherTab().tabItem { Label("Switcher", systemImage: "square.on.square") }.tag(2)
-            DragTab().tabItem { Label("Drag and drop", systemImage: "hand.draw") }.tag(3)
+            DockTab().tabItem { Label("Dock", systemImage: "dock.rectangle") }.tag(3)
+            DragTab().tabItem { Label("Drag and drop", systemImage: "hand.draw") }.tag(4)
         }
         .frame(width: 520, height: 440)
     }
@@ -121,6 +122,21 @@ private struct SwitcherTab: View {
                 .disabled(!switcher)
                 Text("A quick Cmd+Tab under this delay switches without showing the panel.")
                     .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+    }
+}
+
+private struct DockTab: View {
+    @AppStorage(Settings.K.dockPreviews) private var dockPreviews = true
+    @AppStorage(Settings.K.dockClicks) private var dockClicks = true
+
+    var body: some View {
+        Form {
+            Section {
+                Toggle("Show an app's windows when I hover its Dock icon", isOn: $dockPreviews)
+                Toggle("Clicking the app I'm in minimizes it, or steps through its windows", isOn: $dockClicks)
             }
         }
         .formStyle(.grouped)

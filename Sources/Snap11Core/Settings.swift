@@ -21,6 +21,8 @@ enum Settings {
         static let dockNumbers = "dock.numbers"
         static let finderKeys = "finder.keys"
         static let finderZoom = "finder.zoom"
+        static let dockPreviews = "dock.previews"
+        static let dockClicks = "dock.clicks"
     }
 
     static func register() {
@@ -41,6 +43,8 @@ enum Settings {
             K.dockNumbers: true,
             K.finderKeys: true,
             K.finderZoom: true,
+            K.dockPreviews: true,
+            K.dockClicks: true,
         ])
     }
 
@@ -61,6 +65,8 @@ enum Settings {
     static var dockNumbers: Bool { d.bool(forKey: K.dockNumbers) }
     static var finderKeys: Bool { d.bool(forKey: K.finderKeys) }
     static var finderZoom: Bool { d.bool(forKey: K.finderZoom) }
+    static var dockPreviews: Bool { d.bool(forKey: K.dockPreviews) }
+    static var dockClicks: Bool { d.bool(forKey: K.dockClicks) }
 
     /// Launch at login lives with the system, not in UserDefaults.
     static var launchAtLogin: Bool {
