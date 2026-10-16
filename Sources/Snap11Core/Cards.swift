@@ -228,8 +228,9 @@ final class SelectionRing {
         }
         outer.borderWidth = 4
         inner.borderWidth = 2
-        outer.cornerRadius = 16
-        inner.cornerRadius = 12
+        // Concentric with the cards' 8 pt corners: the bands sit 11 and 7 pt outside them.
+        outer.cornerRadius = 8 + 11
+        inner.cornerRadius = 8 + 7
     }
 
     func attach(to layer: CALayer?) {

@@ -29,6 +29,8 @@ if let i = args.firstIndex(of: "--render"), args.count > i + 1 {
     MainActor.assumeIsolated { FinderProbe.run() }
 } else if let i = args.firstIndex(of: "--dock-check"), args.count > i + 1, let pid = pid_t(args[i + 1]) {
     MainActor.assumeIsolated { DockCheck.run(snap11: pid) }
+} else if args.contains("--corners") {
+    MainActor.assumeIsolated { WindowCorners.report() }
 } else if args.contains("--pin-check") {
     MainActor.assumeIsolated { PinCheck.run() }
 } else if args.contains("--divider-check") {

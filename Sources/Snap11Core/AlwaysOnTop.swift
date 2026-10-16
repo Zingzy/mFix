@@ -24,7 +24,31 @@ final class AlwaysOnTop {
         init(window: AXWindow) { self.window = window }
     }
 
-    private var pins: [CGWindowID: Pin] = [:]
+    private var pins: [CGWindowID: Pin] = [:] {
+        didSet { watchClosing() }
+    }
+    private var closeWatch: Timer?
+
+    /// Some apps report a closed window late; WindowServer knows at once. Only runs while
+    /// something is pinned.
+    private func watchClosing() {
+        if pins.isEmpty {
+            closeWatch?.invalidate()
+            closeWatch = nil
+            return
+        }
+        guard closeWatch == nil else { return }
+        closeWatch = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                for (id, pin) in self.pins where (CGWindowListCopyWindowInfo(.optionIncludingWindow, id) as? [[String: Any]] ?? []).isEmpty {
+                    self.stopMirror(pin)
+                    pin.border.hide()
+                    self.pins[id] = nil
+                }
+            }
+        }
+    }
 
     func start() {
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] _ in
@@ -53,7 +77,9 @@ final class AlwaysOnTop {
         let pin = Pin(window: w)
         pin.border.ignoresMouseEvents = true
         pin.border.level = NSWindow.Level(rawValue: NSWindow.Level.floating.rawValue + 1)
-        pin.border.contentView = BorderView()
+        let border = BorderView()
+        border.radius = (WindowCorners.radius(of: w.id, frameWidth: w.frame.width) ?? 16) + 1.5
+        pin.border.contentView = border
         // On the pinned window's own Space only, as a pinned window stays on its own desktop
         // on Windows; the panels join the Space they first appear on.
         pin.border.collectionBehavior = [.ignoresCycle, .fullScreenAuxiliary]
@@ -165,10 +191,12 @@ final class AlwaysOnTop {
 
     // MARK: Views
 
-    /// An accent outline with the rounded corners macOS 26 gives windows.
+    /// An accent outline following the window's own corners, its stroke 1.5 pt outside them.
     private final class BorderView: NSView {
+        var radius: CGFloat = 17.5
+
         override func draw(_ dirtyRect: NSRect) {
-            let path = NSBezierPath(roundedRect: bounds.insetBy(dx: 1.5, dy: 1.5), xRadius: 16, yRadius: 16)
+            let path = NSBezierPath(roundedRect: bounds.insetBy(dx: 1.5, dy: 1.5), xRadius: radius, yRadius: radius)
             path.lineWidth = 3
             NSColor.controlAccentColor.setStroke()
             path.stroke()
