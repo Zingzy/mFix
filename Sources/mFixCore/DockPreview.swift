@@ -8,7 +8,7 @@ import AppKit
 final class DockPreview: Feature {
     static let shared = DockPreview()
 
-    private let panel = OverlayPanel()
+    let panel = OverlayPanel()
     private var watcher: AXWatcher?
     private var list: AXUIElement?
     private var dockPID: pid_t = 0
@@ -82,12 +82,19 @@ final class DockPreview: Feature {
 
     private func show() {
         guard let (icon, url) = hovered, !DragDrop.shared.isDragging, !Switcher.shared.isOpen,
-              let app = DockItems.Item(frame: icon, url: url, title: "").runningApp else { hide(); return }
-        let windows = WindowList.allSpaces(only: app.processIdentifier)
-        if Hotkeys.debug { NSLog("mFix: dock preview for %@: %d windows", url.lastPathComponent, windows.count) }
-        guard !windows.isEmpty else { hide(); return }
-        generation += 1
+              let app = DockItems.Item(frame: icon, url: url, title: "").runningApp, show(app.processIdentifier, icon: icon) else {
+            hide()
+            return
+        }
         shownFor = url
+    }
+
+    /// Cards for one app's windows against its Dock icon; false when it has none.
+    func show(_ pid: pid_t, icon: CGRect) -> Bool {
+        let windows = WindowList.allSpaces(only: pid)
+        if Hotkeys.debug { NSLog("mFix: dock preview for %d: %d windows", pid, windows.count) }
+        guard !windows.isEmpty else { return false }
+        generation += 1
 
         let screen = Geo.screen(at: CGPoint(x: icon.midX, y: icon.midY)) ?? NSScreen.screens[0]
         let pad: CGFloat = 10
@@ -141,6 +148,7 @@ final class DockPreview: Feature {
             guard let self, self.generation == g else { return }
             self.cards.first(where: { $0.target.id == id })?.setThumbnail(image)
         }
+        return true
     }
 
     private func scheduleHide() {

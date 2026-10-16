@@ -4,7 +4,7 @@ import AppKit
 /// Snap Assist shows bare wallpaper in the empty zone.
 @MainActor
 enum Wallpaper {
-    private static var cache: [CGDirectDisplayID: CGImage] = [:]
+    static var cache: [CGDirectDisplayID: CGImage] = [:]
 
     static func image(for screen: NSScreen) -> CGImage? {
         if let c = cache[screen.displayID] { return c }

@@ -4,6 +4,9 @@ import AppKit
 /// windows go last, matching Windows, where minimizing sends a window to the end of the
 /// Alt+Tab list. Windows never focused since launch fall back to z-order.
 enum WindowList {
+    /// Set by the render check: every other app's windows are left out.
+    static var allowed: Set<pid_t>?
+
     /// The topmost ordinary window of another app under `p` (AX coordinates), skipping
     /// menus, panels, the menu bar and invisible windows above it.
     static func windowAt(_ p: CGPoint) -> (id: CGWindowID, pid: pid_t, bounds: CGRect)? {
@@ -27,6 +30,7 @@ enum WindowList {
         }
         for app in apps where !pids.contains(app.processIdentifier) { pids.append(app.processIdentifier) }
         if let only { pids = pids.filter { $0 == only } }
+        if let allowed { pids = pids.filter(allowed.contains) }
 
         let space = SkyLight.activeSpace
         var visible: [CGWindowID: AXWindow] = [:]
@@ -87,6 +91,7 @@ enum WindowList {
         }
         for w in WindowInfo.list([.optionAll, .excludeDesktopElements]) {
             guard w.layer == 0, !known.contains(w.id), w.pid != own, regular.contains(w.pid), only == nil || only == w.pid,
+                  allowed?.contains(w.pid) ?? true,
                   w.alpha > 0, w.bounds.width >= 100, w.bounds.height >= 100,
                   !SkyLight.spaces(for: w.id).isEmpty, SkyLight.isOrderedIn(w.id) else { continue }
             if let e = element(pid: w.pid, id: w.id) ?? RemoteWindows.shared.element(for: w.id) {
