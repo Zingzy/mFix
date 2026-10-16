@@ -1,0 +1,67 @@
+name: Bug report
+description: Something in mFix doesn't work the way it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Security problems go through the Security tab instead, not here.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you got instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open two Finder windows
+        2. Press Cmd+Option+Left on the first
+        3. Pick the second in Snap Assist
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      description: Apple menu, About This Mac.
+      placeholder: macOS 26.4 (25E246)
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: mFix version
+      description: Select mFix in Applications and press Cmd+I.
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: mac
+    attributes:
+      label: Mac model
+      placeholder: MacBook Pro 14-inch, M3, 2023
+    validations:
+      required: true
+  - type: textarea
+    id: displays
+    attributes:
+      label: Displays
+      description: How many, their resolution and scaling, how they are arranged, and where the Dock sits.
+      placeholder: Built-in display plus one 27-inch 4K at "looks like 2560x1440" to the right. Dock at the bottom.
+    validations:
+      required: true
+  - type: textarea
+    id: apps
+    attributes:
+      label: Apps involved
+      description: The apps whose windows misbehaved, and any other window managers or switchers you run.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log
+      description: Optional. Quit mFix, start it with `open --env SNAP11_DEBUG=1 --stderr /tmp/mfix.log /Applications/mFix.app`, reproduce the bug and paste the end of /tmp/mfix.log. It lists app names and window titles, so check it first.
+      render: text

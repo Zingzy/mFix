@@ -9,7 +9,7 @@ trap 'rm -rf "$STAGE"' EXIT
 cp -R build/Snap11.app "$STAGE/"
 ln -s /Applications "$STAGE/Applications"
 # A mounted copy of an older image would make hdiutil fail or serve stale files.
-hdiutil info | awk '/image-path/ && /Snap11.dmg/ {getline; while ($0 !~ /^=/) { if ($1 ~ /^\/dev\//) print $1; if (!getline) break }}' \
+hdiutil info | awk -v img="$PWD/$DMG" '$0 == "image-path      : " img {getline; while ($0 !~ /^=/) { if ($1 ~ /^\/dev\//) print $1; if (!getline) break }}' \
     | sort -u | while read -r dev; do hdiutil detach "$dev" -quiet || true; done
 rm -f "$DMG"
 hdiutil create -volname Snap11 -srcfolder "$STAGE" -fs HFS+ -format UDZO -ov "$DMG" -quiet

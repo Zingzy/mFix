@@ -1,0 +1,27 @@
+name: Feature request
+description: Something Windows does that your Mac should too.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        mFix copies Windows 11 behavior as closely as it can. The best requests show exactly what Windows does.
+  - type: textarea
+    id: windows
+    attributes:
+      label: What does Windows do?
+      description: The keys, the clicks and what you see. A screenshot or a link to Microsoft's docs helps a lot.
+    validations:
+      required: true
+  - type: textarea
+    id: macos
+    attributes:
+      label: What does macOS do?
+      description: What happens today on macOS 26, with mFix running.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it matters to you
+      description: Optional. When you reach for it and how often.
