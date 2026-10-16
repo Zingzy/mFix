@@ -1,53 +1,61 @@
+<div align="center">
+
 # mFix
+
+**The Mac, fixed.**
+
+Windows 11 window management for macOS 26. Yes, Windows. On purpose.
 
 [![Release](https://img.shields.io/github/v/release/Zingzy/mFix)](https://github.com/Zingzy/mFix/releases/latest) [![Downloads](https://img.shields.io/github/downloads/Zingzy/mFix/total)](https://github.com/Zingzy/mFix/releases) [![CI](https://img.shields.io/github/actions/workflow/status/Zingzy/mFix/ci.yml?branch=main&label=CI)](https://github.com/Zingzy/mFix/actions/workflows/ci.yml) [![License](https://img.shields.io/github/license/Zingzy/mFix)](LICENSE) ![macOS 26+](https://img.shields.io/badge/macOS-26%2B-000000?logo=apple&logoColor=white) ![Swift 6](https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white)
 
-mFix: the Mac, fixed.
+**[Download mFix.dmg](https://github.com/Zingzy/mFix/releases/latest/download/mFix.dmg)**
 
-Windows 11 window management for macOS 26. Yes, the Windows one. On purpose.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/snap-assist-dark.png">
+  <img src="docs/images/snap-assist-light.png" alt="A window snapped to the left half of the screen while mFix's Snap Assist offers the other open windows for the right half" width="860">
+</picture>
 
-mFix is a small menu bar app. It brings over the parts of Windows 11 that people miss after switching: Snap Layouts, Snap Assist, an Alt+Tab that shows windows, a Dock that behaves like a taskbar, and a Finder that knows what Enter means.
+</div>
 
-## What your Mac does to you
+## The hot take
 
-The green button has been a zoom button, then a full screen button, then a tile menu, and now a slightly bigger tile menu. It has had more careers than most people.
+The Mac is sold as the productivity machine. It isn't. It's the pretty machine. Productivity is what people say to justify the price.
 
-Cmd+Tab switches between apps, not windows. It lists apps with no windows open. Pick an app whose windows are all minimized and you get its menu bar and nothing else, unless you held Option as you let go, which nobody does because nobody knows.
+Use it for a week after Windows 11 and count how often you fight the window you're looking at. Windows does this part better. Not a little better. Much better. It hurts to type that, but it's true, and Apple has had 25 years to notice.
 
-There was no window snapping at all until Sequoia in 2024. Windows 7 had it in 2009. Now you can drag a window to the edge and get half a screen, and the other half just sits there like an idiot. Nothing asks what goes in it.
+So mFix copies Windows. The snapping, the switcher, the taskbar habits, the Explorer keys. Native Swift, no Electron, a few MB of RAM.
 
-Finder has no Cut. In 2026. Enter renames the file instead of opening it. Delete does nothing. Typing a path is Cmd+Shift+G, obviously.
+**F\*CK MACOS** window management. Here is the case.
 
-Hover a Dock icon and you get a tooltip with the app's name, which you knew, because you were looking at its icon. There is no setting to turn it off. Click the app you are already in and nothing happens.
-
-There is no Always on Top, unless your window happens to be a Picture in Picture video or a Stickies note.
-
-Cmd+Option+Esc gives you Force Quit: a list of apps and one button. For anything more you dig Activity Monitor out of the Utilities folder.
-
-Apple has had twenty-five years of Mac OS X to sort this out. mFix does it this afternoon.
+| You want to | macOS 26 | Windows 11 |
+|---|---|---|
+| Put two windows side by side | Drag one to the edge. The other half of the screen sits there empty and asks nothing. | Snap one. Snap Assist asks which window goes in the other half. |
+| Switch to a window | Cmd+Tab shows apps. Pick an app whose windows are minimized and you get its menu bar and nothing else. | Alt+Tab shows every window, with a picture of each. |
+| Use the green button | Zoom, then full screen, then a tile menu, then a bigger tile menu. Four careers in fifteen years. | Hover maximize, get a grid of layouts, click a zone. |
+| Cut and paste a file | Finder has no Cut. In 2026. | Ctrl+X, Ctrl+V. |
+| Open a file | Enter renames it. | Enter opens it. |
+| Delete a file | Delete does nothing. You need Cmd+Delete. | Delete. |
+| Go to a path | Cmd+Shift+G, obviously. | Click the address bar and type. |
+| Look at an app's windows | Hover the Dock and read the app's name, which you knew, because you were looking at its icon. You can't turn that tooltip off. | Hover the taskbar and see every window. |
+| Keep a window on top | You can't, unless it's a Picture in Picture video or a Stickies note. | PowerToys, Win+Ctrl+T. |
+| Open the task manager | Cmd+Option+Esc gives you a list and one button. | Ctrl+Shift+Esc. |
 
 ## Install
 
-mFix needs macOS 26 (Tahoe) or later.
+1. Download [mFix.dmg](https://github.com/Zingzy/mFix/releases/latest/download/mFix.dmg). It needs macOS 26 (Tahoe) or later.
+2. Drag mFix into Applications and open it.
+3. macOS blocks it, because notarizing costs $99 a year and this is free. Go to System Settings, Privacy & Security, scroll to Security and click **Open Anyway**. Or run this:
 
-1. Download `mFix.dmg` from [Releases](../../releases/latest).
-2. Open it and drag mFix into Applications.
-3. Open mFix. macOS will refuse, because mFix is not notarized. Notarizing needs a paid Apple Developer account, and this is a free app.
-4. Open System Settings, go to Privacy & Security, scroll down to Security, and click Open Anyway next to the mFix message. Enter your password. The button only shows for about an hour after macOS blocks the app.
+   ```sh
+   xattr -dr com.apple.quarantine /Applications/mFix.app
+   ```
 
-Control-click then Open used to skip this. Apple removed that in Sequoia.
+4. Grant **Accessibility** and **Screen Recording** when mFix asks. Its menu bar icon has a shortcut to both.
 
-If macOS says mFix is damaged, or you prefer the terminal, clear the download flag instead:
+Quit Rectangle, AltTab and other window managers first. They want the same keys, and whoever registers first wins.
 
-```sh
-xattr -dr com.apple.quarantine /Applications/mFix.app
-```
-
-mFix lives in the menu bar. There is no Dock icon. Settings and the permission shortcuts are in its menu.
-
-Quit Rectangle, AltTab and other window managers while mFix runs. They want the same keys, and whoever registers first wins.
-
-### Permissions
+<details>
+<summary><b>Why each permission</b></summary>
 
 | Permission | What mFix uses it for |
 |---|---|
@@ -55,46 +63,63 @@ Quit Rectangle, AltTab and other window managers while mFix runs. They want the 
 | Screen Recording | Window thumbnails in the switcher, Snap Assist and Dock previews, and the live copy Always on Top floats over other apps. |
 | Automation for Finder | Asked the first time Cmd+V moves files into a selected folder. mFix asks Finder for the front folder and the selection, then tells Finder to move the files. |
 
-macOS ties these grants to the app's signature. If a permission stops working after an update, remove mFix from that list with the minus button and add it again.
+macOS ties these grants to the app's signature. Every release is signed with the same certificate, so grants survive updates. If one stops working anyway, remove mFix from that list with the minus button and add it again.
 
-### Turn off the Mac's own tiling
+</details>
+
+<details>
+<summary><b>Turn off the Mac's own tiling</b></summary>
 
 macOS 15 and later have their own drag-to-edge tiling. With both on you get two previews. In System Settings, go to Desktop & Dock, then Windows, and turn off "Drag windows to screen edges to tile".
 
+</details>
+
 ## The Windows key
 
-Macs have no Windows key, so mFix uses a chord. Below, **Win** means Cmd+Option. You can switch it to Ctrl+Option or Ctrl+Cmd in Settings if Cmd+Option clashes with an app you use.
+Macs don't have one, so mFix uses a chord. Below, **Win** means **Cmd+Option**. If that clashes with an app you use, switch it to Ctrl+Option or Ctrl+Cmd in Settings.
 
 ## Snapping
 
-macOS gives you half a screen. mFix gives you the whole Windows 11 snap system, without the animations. Windows appear where they go, at once.
+> **macOS:** half a screen, and good luck with the other half.
+> **mFix:** the whole Windows 11 snap system. No animations. Windows land where they go, at once.
 
 | Keys | What happens |
 |---|---|
-| Win+Left, Win+Right | Snap to the left or right half. Press it again toward the other side to restore, or past the edge to move onto the next monitor. |
+| Win+Left, Win+Right | Snap to the left or right half. Press toward the other side to restore, or past the edge to move to the next monitor. |
 | Win+Up | Maximize. From a half, go to the top quarter on that side. |
 | Win+Down | From maximized, restore. From a half, go to the bottom quarter. From a normal window, minimize. |
 | Cmd+Option+Ctrl+Up, Down | Snap to the top or bottom half. |
 | Win+Shift+Left, Right | Move the window to the next monitor, keeping its spot and its snap. |
 | Win+Shift+Up | Stretch the window to the full height of the screen. |
 | Win+Shift+Down | Restore the window to its size before it snapped. |
-| Win+Z | Open Snap Layouts for the front window with number badges. Type a layout's number, then a zone's. Arrows, Tab and Enter work too. |
+| Win+Z | Open Snap Layouts with number badges. Type a layout's number, then a zone's. Arrows, Tab and Enter work too. |
 
-The rules match the Windows 11 table, quarters included: snap left, then Win+Up, and you are in the top left quarter. `swift test` checks the rules against that table.
+The rules match the Windows 11 table, quarters included. Snap left, press Win+Up, and you're in the top left quarter. `swift test` checks the rules against that table.
 
-**Snap Layouts.** Hover the green button and macOS shows a menu. With mFix you get the Windows 11 grid of layouts instead, after 600 ms. Click a zone and the window goes there. The first one or two layouts are suggestions built from the windows you have open, with their icons in the zones: pick one and they all land at once. Wide screens get six layouts, smaller ones four, portrait screens get stacked ones.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/layouts-dark.png">
+  <img src="docs/images/layouts-light.png" alt="The Snap Layouts flyout under a window's green button, with suggested layouts showing app icons in their zones" width="560">
+</picture>
 
-**Snap Assist.** After a window snaps, the empty part of the screen shows cards of your other windows. Pick one and it fills the gap. If more gaps are left, it moves on to the next one. Arrows move, Enter picks, Esc stops, and Delete closes the highlighted window.
+**Snap Layouts.** Hover the green button for 600 ms and you get the Windows 11 grid of layouts instead of Apple's menu. Click a zone and the window goes there. The first one or two layouts are built from the windows you have open, with their icons in the zones. Pick one and they all land at once. Wide screens get six layouts, smaller ones four, portrait screens get stacked ones.
 
-**Drag to snap.** Drag a window by its title bar to a screen edge for a half, a corner for a quarter, or the top edge to maximize. A preview shows where it will land. Esc cancels. Drag a snapped window away and it goes back to its old size, still under your pointer. Edges shared with another monitor don't count, so you can still drag across.
+**Snap Assist.** After a window snaps, the empty part of the screen shows cards of your other windows. Pick one and it fills the gap. If more gaps are left, it moves to the next one. Arrows move, Enter picks, Esc stops, Delete closes the highlighted window.
 
-**Snap groups.** Windows you snap together through Snap Assist or a layout become a group. Resize one and its neighbors follow. The group shows as one card in the switcher, and picking it brings the whole group forward.
+**Drag to snap.** Drag a window by its title bar to an edge for a half, a corner for a quarter, or the top to maximize. A preview shows where it lands. Esc cancels. Drag a snapped window away and it goes back to its old size, still under your pointer.
 
-**Divider handle.** Hover the line where two snapped windows touch and a small handle appears. Drag it to resize both sides at once. It works on any snapped windows that touch, grouped or not.
+**Snap groups.** Windows you snap together through Snap Assist or a layout become a group. Resize one and its neighbours follow. The group is one card in the switcher, and picking it brings the whole group forward.
+
+**Divider handle.** Hover the line where two snapped windows touch and a handle appears. Drag it to resize both sides at once. It works on any snapped windows that touch, grouped or not.
 
 ## Switcher
 
-macOS's Cmd+Tab shows apps. mFix's switcher shows windows, like Alt+Tab on Windows 11.
+> **macOS:** Cmd+Tab shows apps, including ones with no windows open.
+> **mFix:** Cmd+Tab shows windows, like Alt+Tab on Windows 11.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/switcher-dark.png">
+  <img src="docs/images/switcher-light.png" alt="mFix's Cmd+Tab switcher showing one card per window, each with a live thumbnail, title and app icon" width="860">
+</picture>
 
 | Keys | What happens |
 |---|---|
@@ -106,47 +131,59 @@ macOS's Cmd+Tab shows apps. mFix's switcher shows windows, like Alt+Tab on Windo
 | Esc | Close the switcher and stay put. |
 | Delete or W | Close the highlighted window. |
 
-- One card per window, in most recently used order. Minimized windows go last, as on Windows.
+- One card per window, most recently used first. Minimized windows go last, as on Windows.
 - Windows from every Space, or only the current one. Your pick in Settings.
-- Apps with no windows don't show up. They have nothing to switch to.
+- Apps with no windows don't show up. There's nothing to switch to.
 - Thumbnails for every window, minimized ones and other Spaces included. The ones on screen stay live.
-- A snap group is one card. Picking it brings the whole group forward.
-- Each card has a close button.
-- The cards shrink as windows pile up, stay in two rows, then the panel scrolls.
+- A snap group is one card. Each card has a close button.
+- Cards shrink as windows pile up, stay in two rows, then the panel scrolls.
 - A quick Cmd+Tab under 90 ms switches without drawing the panel at all.
 - It works mid-drag. Cmd+Tab while dragging a file, hover a card for half a second, and that window comes forward so you can drop into it.
 
-Thumbnails refresh three times a second, only while a panel is open. When nothing is showing, nothing is capturing.
+Thumbnails refresh three times a second, and only while a panel is open. When nothing is showing, nothing is capturing.
 
 ## Desktop
+
+> **macOS:** Mission Control, Exposé, Stage Manager, Show Desktop, Hide Others. Five features, none of them Win+D.
+> **mFix:** Win+D.
 
 | Keys | What happens |
 |---|---|
 | Win+Home | Minimize every window on this Space except the one in front. Press again to bring them back. |
 | Win+D | Minimize everything to show the desktop. Press again to bring it all back. |
 | Win+1 to Win+9 | The nth app in the Dock. Not running: open it. In the back: bring it forward. Already in front: step through its windows, or minimize it if it has one. |
-| Cmd+Shift+Esc | Open Activity Monitor, which is as close to Task Manager as a Mac gets. |
+| Cmd+Shift+Esc | Open Activity Monitor, the closest thing to Task Manager a Mac has. |
 
 ## Dock
 
-macOS shows you the app's name. mFix shows you its windows.
+> **macOS:** hover an icon, read the app's name.
+> **mFix:** hover an icon, see its windows.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/dock-dark.png">
+  <img src="docs/images/dock-light.png" alt="Window cards above a Dock icon, one for each of the app's windows" width="560">
+</picture>
 
 - Hover a Dock icon and its windows appear as cards above it after 250 ms. Click a card to go to that window, on any Space. Click its X to close it. Once one preview is open, moving to the next icon switches right away.
-- The cards cover the Dock's name tooltip. That is as close as anyone has come to turning it off.
-- Click the icon of the app you are already in and it minimizes, the way a taskbar button does. If the app has several windows, each click steps to the next one.
+- The cards cover the Dock's name tooltip. That's as close as anyone has come to turning it off.
+- Click the icon of the app you're already in and it minimizes, the way a taskbar button does. With several windows, each click steps to the next one.
 - Works with the Dock at the bottom, left or right.
 
 ## Drag and drop
 
-macOS shows a ghost of the file under your pointer and wishes you luck. mFix helps.
+> **macOS:** a ghost of the file under your pointer, and good wishes.
+> **mFix:** help.
 
-- A small preview of what you are dragging sits next to the pointer: a stack of file thumbnails with a count, an image, or a snippet of text.
-- Hold a drag over an app's Dock icon for half a second and that app's window comes forward, even from another Space or a full screen Space. Drop right into it.
-- Cmd+Tab works while you drag. See Switcher.
+- A small preview of what you're dragging sits next to the pointer: a stack of file thumbnails with a count, an image, or a snippet of text.
+- Hold a drag over an app's Dock icon for half a second and its window comes forward, even from another Space or a full screen Space. Drop right into it.
+- Cmd+Tab works while you drag. See [Switcher](#switcher).
 
 ## Finder, but Explorer
 
-macOS has no Cut, renames on Enter and ignores Delete. mFix makes Finder take the keys you already know. They only apply when Finder is in front and focus is on files. Renaming, the search field, path boxes and dialogs keep their normal keys.
+> **macOS:** no Cut, Enter renames, Delete does nothing. **F\*CK MACOS.**
+> **mFix:** the keys you already know.
+
+They only apply when Finder is in front and focus is on files. Renaming, the search field, path boxes and dialogs keep their normal keys.
 
 | Keys | Finder without mFix | Finder with mFix |
 |---|---|---|
@@ -162,19 +199,25 @@ Cmd+V moves files into the selected folder when one is selected in list view, no
 
 ## Always on Top
 
-macOS has no Always on Top. mFix copies PowerToys.
+> **macOS:** no.
+> **mFix:** PowerToys' version, on a Mac.
 
 | Keys | What happens |
 |---|---|
 | Cmd+Option+Ctrl+T | Pin the front window above everything else. Press again to unpin. |
 
-A pinned window gets an accent border that follows that window's own corner radius, so it fits Tahoe's round windows and the square ones too. It stays on its own Space. Closing the window unpins it.
+A pinned window gets an accent border that follows that window's own corner radius, so it fits Tahoe's round windows and square ones alike. It stays on its own Space. Closing the window unpins it.
 
-macOS gives one app no way to lift another app's window above the app in front. So while you work in another window, mFix lays a live copy of the pinned one exactly over it. Click it and the real window comes forward.
+macOS gives one app no way to lift another app's window above the app in front. So while you work in another window, mFix lays a live copy of the pinned one exactly over it. Click the copy and the real window comes forward.
 
 ## Settings
 
-Click the menu bar icon, then Settings. Every feature has a switch and changes apply at once. Each section also lists its keyboard shortcuts, with the Win keys you picked.
+Click the menu bar icon, then Settings. Every feature has a switch, changes apply at once, and each section lists its shortcuts with the Win keys you picked.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/settings-dark.png">
+  <img src="docs/images/settings-light.png" alt="mFix's settings window in the System Settings style, with a sidebar of sections and the Snapping page open" width="720">
+</picture>
 
 | Section | What you can change |
 |---|---|
@@ -186,24 +229,26 @@ Click the menu bar icon, then Settings. Every feature has a switch and changes a
 | Drag and drop | The drag preview, Dock spring loading and how long to hold. |
 | Finder | Finder keys and which terminal Cmd+Option+T opens. |
 | Always on Top | Pinning with Cmd+Option+Ctrl+T. |
-| Permissions | Whether Accessibility, Screen Recording and Automation for Finder are granted, with a button to each list in System Settings. |
+| Permissions | Whether each permission is granted, with a button to its list in System Settings. |
 | About | Version, source code and license. |
 
-## What mFix changes on your Mac
+## The fine print
 
-To own Cmd+Tab, mFix turns off the system's Cmd+Tab and Cmd+Shift+Tab while it runs. When Win is Cmd+Option and Win+D is on, it also turns off Cmd+Option+D, the Dock hiding shortcut. It saves how each one was before and puts them back when it quits, when it crashes, and on the next launch if it was force killed.
+### What mFix changes on your Mac
 
-mFix also uses private macOS functions for things no public API does, like capturing minimized windows and bringing one window of another app forward. A macOS update can break them.
+To own Cmd+Tab, mFix turns off the system's Cmd+Tab and Cmd+Shift+Tab while it runs. When Win is Cmd+Option and Win+D is on, it also turns off Cmd+Option+D, the Dock hiding shortcut. It saves how each one was and puts them back when it quits, when it crashes, and on the next launch if it was force killed.
 
-## Privacy
+mFix uses private macOS functions for things no public API does, like capturing minimized windows and bringing one window of another app forward. A macOS update can break them. Apple could also just ship this. They won't.
+
+### Privacy
 
 Nothing leaves your Mac. mFix has no networking code, no telemetry, no analytics, no update checks and no accounts. Window thumbnails stay in memory and are never written to disk. The full list is in [PRIVACY.md](.github/PRIVACY.md).
 
-## Uninstall
+### Uninstall
 
 Quit mFix from its menu bar icon, so it puts Cmd+Tab back. Drag it from Applications to the Trash. Remove it from Accessibility and Screen Recording in Privacy & Security. Its settings live in `~/Library/Preferences/dev.zingzy.mfix.plist`.
 
-## Build from source
+### Build from source
 
 You need macOS 26 and Xcode 26, for the macOS 26 SDK.
 
@@ -214,12 +259,12 @@ scripts/build.sh     # build/mFix.app
 scripts/dmg.sh       # build/mFix.dmg
 ```
 
-`scripts/build.sh` signs ad hoc unless it finds a signing certificate. An ad hoc build gets a new signature every time, so macOS asks for the permissions again after each rebuild. [docs/releasing.md](docs/releasing.md) shows how to sign with a stable certificate. [CONTRIBUTING.md](.github/CONTRIBUTING.md) covers the in-process checks.
+`scripts/build.sh` signs ad hoc unless it finds a signing certificate, and an ad hoc build makes macOS ask for permissions again after every rebuild. [docs/releasing.md](docs/releasing.md) shows how to sign with a stable certificate. [CONTRIBUTING.md](.github/CONTRIBUTING.md) covers the checks.
 
-## Not affiliated
+### Not affiliated
 
-mFix is not affiliated with, endorsed by or sponsored by Microsoft or Apple. Windows, Windows 11, PowerToys, macOS, Finder and Dock are trademarks of their owners. mFix just copies the good ideas.
+mFix is not affiliated with, endorsed by or sponsored by Microsoft or Apple. Windows, Windows 11, PowerToys, macOS, Finder and Dock are trademarks of their owners. mFix just copies the good ideas from one and puts them on the other.
 
-## License
+### License
 
 [MIT](LICENSE)
