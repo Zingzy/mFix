@@ -79,11 +79,11 @@ final class SnapAssist {
     private func showNext() {
         guard let screen else { end(); return }
         // Re-check each zone; something may have filled it since the queue was built.
+        zone = nil
         while let next = queue.first {
             queue.removeFirst()
             let still = SnapEngine.shared.emptyZones(after: .full, layout: Layout(zones: [next]), on: screen, ignoring: placed)
             if !still.isEmpty { zone = next; break }
-            zone = nil
         }
         guard let zone else { end(); return }
         let candidates = WindowList.currentSpace(excluding: placed)
@@ -168,6 +168,12 @@ final class SnapAssist {
 
     private func updateRing() {
         ring.move(around: cards.indices.contains(selected) ? cards[selected].frame : nil)
+    }
+
+    var cardIDs: [CGWindowID] { cards.map(\.target.id) }
+
+    func pick(window id: CGWindowID) {
+        if let i = cards.firstIndex(where: { $0.target.id == id }) { pick(i) }
     }
 
     private func pick(_ i: Int) {

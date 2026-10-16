@@ -35,6 +35,8 @@ if let i = args.firstIndex(of: "--render"), args.count > i + 1 {
     MainActor.assumeIsolated { FinderCheck.run() }
 } else if args.contains("--minimize-check") {
     MainActor.assumeIsolated { SnapCheck.minimizeCheck() }
+} else if args.contains("--assist-repro") {
+    DispatchQueue.main.async { MainActor.assumeIsolated { AssistRepro.run() } }
 } else if args.contains("--snap-check") {
     MainActor.assumeIsolated { SnapCheck.run() }
 } else if let unknown = args.dropFirst().first(where: { $0.hasPrefix("--") }) {
