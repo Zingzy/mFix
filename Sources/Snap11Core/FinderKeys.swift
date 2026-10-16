@@ -99,7 +99,8 @@ final class FinderKeys {
 
         if shiftOnly && deleteKey {
             // Delete Immediately, which asks before it deletes, like Shift+Delete in Explorer.
-            guard press(Self.deleteImmediately) else { return false }
+            // Its menu item is a hidden alternate that ignores a press, so the chord goes instead.
+            post(Code.delete, [.maskCommand, .maskAlternate])
             swallowedUps.insert(code)
             return true
         }
@@ -116,7 +117,10 @@ final class FinderKeys {
             if Hotkeys.debug { NSLog("Snap11: finder paste, cut %ld now %ld", cutCount ?? -1, NSPasteboard.general.changeCount) }
             guard let cut = cutCount, cut == NSPasteboard.general.changeCount else { return false }
             cutCount = nil
-            guard press(Self.moveItemHere) else { return false }
+            let sources = (NSPasteboard.general.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]) ?? []
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated { FinderKeys.shared.paste(sources) }
+            }
         case (Code.l, false):
             guard press(Self.goToFolder) else { return false }
         default: return false
@@ -143,9 +147,13 @@ final class FinderKeys {
         }
     }
 
+    /// A private source, so the keys held down (Shift for Shift+Delete) don't merge into the
+    /// chord posted, which made Cmd+Option+Delete land as Cmd+Option+Shift+Delete.
+    private let source = CGEventSource(stateID: .privateState)
+
     private func post(_ code: Int64, _ flags: CGEventFlags) {
         for down in [true, false] {
-            guard let e = CGEvent(keyboardEventSource: nil, virtualKey: CGKeyCode(code), keyDown: down) else { continue }
+            guard let e = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(code), keyDown: down) else { continue }
             e.flags = flags
             e.setIntegerValueField(.eventSourceUserData, value: FinderKeys.tag)
             e.post(tap: .cgSessionEventTap)
@@ -160,13 +168,12 @@ final class FinderKeys {
     private struct Shortcut: Hashable { let char: UInt32; let mods: Int }
     private static let moveItemHere = Shortcut(char: 86, mods: 2)
     private static let goToFolder = Shortcut(char: 71, mods: 1)
-    private static let deleteImmediately = Shortcut(char: 8, mods: 2)
     nonisolated(unsafe) private var menuItems: [Shortcut: AXUIElement] = [:]
 
     private func readMenu() {
         guard let finder = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.finder").first else { return }
         let pid = finder.processIdentifier
-        let wanted: Set<Shortcut> = [Self.moveItemHere, Self.goToFolder, Self.deleteImmediately]
+        let wanted: Set<Shortcut> = [Self.moveItemHere, Self.goToFolder]
         DispatchQueue.global(qos: .userInitiated).async {
             let app = AXUIElementCreateApplication(pid)
             AXUIElementSetMessagingTimeout(app, 0.5)
@@ -183,6 +190,37 @@ final class FinderKeys {
                 }
             }
             DispatchQueue.main.async { MainActor.assumeIsolated { FinderKeys.shared.menuItems = found } }
+        }
+    }
+
+    /// Into the selected folder, or the folder of the selected files, when that is not the
+    /// window's own: Finder's paste only ever goes to the top folder of a list or column view.
+    private func paste(_ sources: [URL]) {
+        // Off the main thread: the first script call waits on macOS asking the person.
+        DispatchQueue.global(qos: .userInitiated).async {
+            let (top, selected) = FinderScript.windowAndSelection()
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated { FinderKeys.shared.paste(sources, top: top, selected: selected) }
+            }
+        }
+    }
+
+    private func paste(_ sources: [URL], top: URL?, selected: [URL]) {
+        var dest = top
+        if selected.count == 1, (try? selected[0].resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true,
+           !FileIndex.isPackage(selected[0].lastPathComponent) {
+            dest = selected[0]
+        } else if let first = selected.first {
+            let parents = Set(selected.map { $0.deletingLastPathComponent().standardizedFileURL })
+            if parents.count == 1 { dest = first.deletingLastPathComponent() }
+        }
+        if Hotkeys.debug { NSLog("Snap11: finder paste into %@ (window %@)", dest?.path ?? "-", top?.path ?? "-") }
+        guard let dest, let top, dest.standardizedFileURL != top.standardizedFileURL, !sources.isEmpty else {
+            press(Self.moveItemHere)
+            return
+        }
+        DispatchQueue.global(qos: .userInitiated).async {
+            if !FinderScript.move(sources, to: dest) { DispatchQueue.main.async { NSSound.beep() } }
         }
     }
 

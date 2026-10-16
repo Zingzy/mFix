@@ -12,5 +12,6 @@
     <key>LSMinimumSystemVersion</key><string>26.0</string>
     <key>LSUIElement</key><true/>
     <key>NSHighResolutionCapable</key><true/>
+    <key>NSAppleEventsUsageDescription</key><string>Snap11 asks Finder for the selected folder so Cmd+V can move files into it.</string>
 </dict>
 </plist>

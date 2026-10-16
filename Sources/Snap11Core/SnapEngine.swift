@@ -11,6 +11,7 @@ final class SnapEngine {
         var lastSet: CGRect
         var zone: Zone
         var screenID: CGDirectDisplayID
+        var window: AXWindow
     }
 
     private var records: [CGWindowID: Record] = [:]
@@ -67,7 +68,7 @@ final class SnapEngine {
             window.setFrame(actual)
             actual = window.frame
         }
-        records[window.id] = Record(restore: restore, lastSet: actual, zone: zone, screenID: screen.displayID)
+        records[window.id] = Record(restore: restore, lastSet: actual, zone: zone, screenID: screen.displayID, window: window)
     }
 
     func restore(_ window: AXWindow) {
@@ -89,6 +90,12 @@ final class SnapEngine {
     }
 
     func forget(_ window: AXWindow) { records[window.id] = nil }
+
+    /// Windows Snap11 snapped on a screen, at the frames it last put them at. Cheap: no app
+    /// is asked, so the divider can look on every pointer move.
+    func snapped(on screen: NSScreen) -> [(window: AXWindow, frame: CGRect)] {
+        records.values.filter { $0.screenID == screen.displayID && $0.zone != .full }.map { ($0.window, $0.lastSet) }
+    }
 
     /// A snapped window resized in place (its group's divider, or its edge): it stays
     /// arranged at its new size and keeps its restore frame.

@@ -134,94 +134,128 @@ final class SnapGroups {
 
     // MARK: The divider handle
 
-    /// The vertical edge two side-by-side members share, if the pointer is on it.
-    private func sharedEdge(at p: CGPoint) -> (Group, left: [AXWindow], right: [AXWindow], x: CGFloat)? {
-        for g in groups {
-            for a in g.members where !a.isMinimized {
-                guard let fa = g.frames[a.id], abs(p.x - fa.maxX) <= 6, p.y > fa.minY, p.y < fa.maxY else { continue }
-                let rights = g.members.filter { b in
-                    guard b != a, !b.isMinimized, let fb = g.frames[b.id] else { return false }
-                    return abs(fb.minX - fa.maxX) <= 3
+    /// A line two or more snapped windows share, vertical (side by side) or horizontal (one
+    /// above another), if the pointer is on it. Any snapped windows that touch count, grouped or
+    /// not, as on Windows. `before` are the windows left of or above it. Apps that size in
+    /// steps (a terminal's whole character cells) leave a gap, so touching allows 12 pt.
+    private struct Edge {
+        let vertical: Bool
+        let at: CGFloat
+        let before: [(window: AXWindow, frame: CGRect)]
+        let after: [(window: AXWindow, frame: CGRect)]
+    }
+
+    private static let touch: CGFloat = 12
+
+    private func sharedEdge(at p: CGPoint) -> Edge? {
+        guard let screen = Geo.screen(at: p) else { return nil }
+        let live = SnapEngine.shared.snapped(on: screen).filter { !$0.window.isMinimized }
+        for a in live {
+            let fa = a.frame
+            for vertical in [true, false] {
+                let line = vertical ? fa.maxX : fa.maxY
+                let after = live.filter { b in
+                    b.window != a.window && abs((vertical ? b.frame.minX : b.frame.minY) - line) <= Self.touch
                 }
-                guard !rights.isEmpty else { continue }
-                let lefts = g.members.filter { b in
-                    guard !b.isMinimized, let fb = g.frames[b.id] else { return false }
-                    return abs(fb.maxX - fa.maxX) <= 3
-                }
-                return (g, lefts, rights, fa.maxX)
+                // Something must actually sit across the line from the window under the pointer.
+                guard after.contains(where: { b in vertical ? (b.frame.minY < fa.maxY && b.frame.maxY > fa.minY)
+                                                            : (b.frame.minX < fa.maxX && b.frame.maxX > fa.minX) }) else { continue }
+                guard let far = after.map({ vertical ? $0.frame.minX : $0.frame.minY }).max() else { continue }
+                let inGap = vertical ? p.x >= line - 6 && p.x <= far + 6 && p.y > fa.minY && p.y < fa.maxY
+                                     : p.y >= line - 6 && p.y <= far + 6 && p.x > fa.minX && p.x < fa.maxX
+                guard inGap else { continue }
+                let before = live.filter { abs((vertical ? $0.frame.maxX : $0.frame.maxY) - line) <= Self.touch }
+                return Edge(vertical: vertical, at: (line + far) / 2, before: before, after: after)
             }
         }
         return nil
     }
 
+    /// For the divider check: drag whatever line passes through `p` to `line`, as the handle does.
+    @discardableResult
+    func dragLine(at p: CGPoint, to line: CGFloat) -> Bool {
+        guard let edge = sharedEdge(at: p) else { return false }
+        drag(edge, to: line, done: true)
+        return true
+    }
+
     private func pointerMoved() {
-        guard !groups.isEmpty, !divider.dragging else { return }
+        guard !divider.dragging else { return }
         let p = Geo.flip(NSEvent.mouseLocation)
-        guard let (g, lefts, rights, x) = sharedEdge(at: p),
-              WindowList.windowAt(p).map({ hit in g.members.contains { $0.id == hit.id } }) ?? false else {
+        guard let edge = sharedEdge(at: p) else {
             divider.hide()
             return
         }
-        divider.show(atX: x, y: p.y) { [weak self] newX, done in
-            self?.drag(g, lefts: lefts, rights: rights, to: newX, done: done)
+        divider.show(vertical: edge.vertical, at: edge.at, along: edge.vertical ? p.y : p.x) { [weak self] moved, done in
+            self?.drag(edge, to: moved, done: done)
         }
     }
 
-    private func drag(_ g: Group, lefts: [AXWindow], rights: [AXWindow], to x: CGFloat, done: Bool) {
-        for w in lefts {
-            guard var f = g.frames[w.id], x - f.minX > 160 else { return }
-            f.size.width = x - f.minX
-            settle(w.id)
-            w.setFrame(f)
-            g.frames[w.id] = f
+    /// The windows on each side keep their far edges; their shared edges meet at `line`.
+    private func drag(_ edge: Edge, to line: CGFloat, done: Bool) {
+        let minimum: CGFloat = edge.vertical ? 160 : 120
+        for w in edge.before where line - (edge.vertical ? w.frame.minX : w.frame.minY) <= minimum { return }
+        for w in edge.after where (edge.vertical ? w.frame.maxX : w.frame.maxY) - line <= minimum { return }
+        for w in edge.before {
+            var f = w.frame
+            if edge.vertical { f.size.width = line - f.minX } else { f.size.height = line - f.minY }
+            settle(w.window.id)
+            w.window.setFrame(f)
         }
-        for w in rights {
-            guard var f = g.frames[w.id], f.maxX - x > 160 else { return }
-            f = CGRect(x: x, y: f.minY, width: f.maxX - x, height: f.height)
-            settle(w.id)
-            w.setFrame(f)
-            g.frames[w.id] = f
+        for w in edge.after {
+            let f = w.frame
+            settle(w.window.id)
+            w.window.setFrame(edge.vertical ? CGRect(x: line, y: f.minY, width: f.maxX - line, height: f.height)
+                                            : CGRect(x: f.minX, y: line, width: f.width, height: f.maxY - line))
         }
         if done {
-            for w in lefts + rights {
-                g.frames[w.id] = w.frame
-                SnapEngine.shared.adopt(w)
+            for w in edge.before + edge.after {
+                SnapEngine.shared.adopt(w.window)
+                if let g = group(containing: w.window.id) { g.frames[w.window.id] = w.window.frame }
             }
         }
     }
 }
 
-/// Windows 11's divider: a small rounded bar on the line between two snapped windows. Drag
-/// it to move the line.
+/// Windows 11's divider: a small rounded bar on the line between two snapped windows, upright
+/// on a line between windows side by side and lying flat on one between windows stacked.
+/// Drag it to move the line.
 @MainActor
 final class DividerHandle {
     private let panel = OverlayPanel(takesKeyboard: false)
     private let view = HandleView()
     private(set) var dragging = false
     private var onDrag: ((CGFloat, Bool) -> Void)?
-    private var x: CGFloat = 0
+    private var at: CGFloat = 0
+    private var vertical = true
 
     init() {
         panel.contentView = view
-        view.onDrag = { [weak self] dx, done in
+        view.onDrag = { [weak self] delta, done in
             guard let self else { return }
             self.dragging = !done
-            let newX = self.x + dx
-            self.onDrag?(newX, done)
+            // AppKit's y grows up and AX's grows down.
+            let moved = self.at + (self.vertical ? delta.x : -delta.y)
+            self.onDrag?(moved, done)
             var f = self.panel.frame
-            f.origin.x = newX - f.width / 2
+            if self.vertical { f.origin.x = moved - f.width / 2 } else { f.origin.y = Geo.flip(CGPoint(x: 0, y: moved)).y - f.height / 2 }
             self.panel.setFrame(f, display: true)
-            if done { self.x = newX }
+            if done { self.at = moved }
         }
     }
 
-    func show(atX x: CGFloat, y: CGFloat, onDrag: @escaping (CGFloat, Bool) -> Void) {
-        self.x = x
+    func show(vertical: Bool, at line: CGFloat, along: CGFloat, onDrag: @escaping (CGFloat, Bool) -> Void) {
+        self.at = line
+        self.vertical = vertical
         self.onDrag = onDrag
-        let size = CGSize(width: 12, height: 64)
-        let frame = Geo.flip(CGRect(x: x - size.width / 2, y: y - size.height / 2, width: size.width, height: size.height))
+        view.vertical = vertical
+        let size = vertical ? CGSize(width: 12, height: 64) : CGSize(width: 64, height: 12)
+        let center = vertical ? CGPoint(x: line, y: along) : CGPoint(x: along, y: line)
+        let frame = Geo.flip(CGRect(x: center.x - size.width / 2, y: center.y - size.height / 2, width: size.width, height: size.height))
         panel.appearance = Theme.appearance
         panel.show(frame: frame)
+        view.needsDisplay = true
+        panel.invalidateCursorRects(for: view)
     }
 
     func hide() {
@@ -229,19 +263,26 @@ final class DividerHandle {
     }
 
     final class HandleView: NSView {
-        var onDrag: ((CGFloat, Bool) -> Void)?
-        private var start: CGFloat = 0
+        var onDrag: ((CGPoint, Bool) -> Void)?
+        var vertical = true
+        private var start: CGPoint = .zero
 
         override func draw(_ dirtyRect: NSRect) {
-            let bar = bounds.insetBy(dx: 3, dy: 4)
+            let bar = vertical ? bounds.insetBy(dx: 3, dy: 4) : bounds.insetBy(dx: 4, dy: 3)
+            let r = min(bar.width, bar.height) / 2
             (Theme.dark ? NSColor(white: 0.85, alpha: 0.95) : NSColor(white: 0.25, alpha: 0.9)).setFill()
-            NSBezierPath(roundedRect: bar, xRadius: bar.width / 2, yRadius: bar.width / 2).fill()
+            NSBezierPath(roundedRect: bar, xRadius: r, yRadius: r).fill()
         }
 
-        override func resetCursorRects() { addCursorRect(bounds, cursor: .resizeLeftRight) }
+        override func resetCursorRects() { addCursorRect(bounds, cursor: vertical ? .resizeLeftRight : .resizeUpDown) }
         override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
-        override func mouseDown(with event: NSEvent) { start = NSEvent.mouseLocation.x }
-        override func mouseDragged(with event: NSEvent) { onDrag?(NSEvent.mouseLocation.x - start, false) }
-        override func mouseUp(with event: NSEvent) { onDrag?(NSEvent.mouseLocation.x - start, true) }
+        override func mouseDown(with event: NSEvent) { start = NSEvent.mouseLocation }
+        override func mouseDragged(with event: NSEvent) { onDrag?(delta, false) }
+        override func mouseUp(with event: NSEvent) { onDrag?(delta, true) }
+
+        private var delta: CGPoint {
+            let p = NSEvent.mouseLocation
+            return CGPoint(x: p.x - start.x, y: p.y - start.y)
+        }
     }
 }
