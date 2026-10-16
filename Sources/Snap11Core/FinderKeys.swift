@@ -49,7 +49,6 @@ final class FinderKeys {
         guard on, tap == nil, AXIsProcessTrusted() else { return }
         readMenu()
         let mask = CGEventMask(1 << CGEventType.keyDown.rawValue) | CGEventMask(1 << CGEventType.keyUp.rawValue)
-            | CGEventMask(1 << CGEventType.scrollWheel.rawValue)
         tap = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap, eventsOfInterest: mask,
                                 callback: { _, type, event, _ in
             if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
@@ -70,18 +69,6 @@ final class FinderKeys {
 
     private func handle(_ type: CGEventType, _ e: CGEvent) -> Bool {
         if e.getIntegerValueField(.eventSourceUserData) == FinderKeys.tag { return false }
-        if type == .scrollWheel {
-            guard e.flags.intersection([.maskCommand, .maskShift, .maskAlternate, .maskControl]) == .maskCommand else { return false }
-            let under = WindowList.windowAt(e.location)
-            let overFinder = under.flatMap { NSRunningApplication(processIdentifier: $0.pid)?.bundleIdentifier } == "com.apple.finder"
-            // A wheel notch fills the line field; a trackpad only the point field.
-            let lines = e.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1)
-            let points = e.getDoubleValueField(.scrollWheelEventPointDeltaAxis1)
-            let delta = lines != 0 ? lines : points
-            if Hotkeys.debug { NSLog("Snap11: finder cmd+scroll lines %.2f points %.2f over finder %d", lines, points, overFinder ? 1 : 0) }
-            guard overFinder else { return false }
-            return FinderZoom.shared.scroll(deltaY: delta)
-        }
         let code = e.getIntegerValueField(.keyboardEventKeycode)
         if type == .keyUp { return swallowedUps.remove(code) != nil }
 

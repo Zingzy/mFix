@@ -20,7 +20,6 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         DragSnap.shared.start()
         DragDrop.shared.start()
         FinderKeys.shared.start()
-        FinderZoom.shared.start()
         DockPreview.shared.start()
         SnapGroups.shared.start()
         Settings.register()
@@ -113,6 +112,12 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             for (n, code) in Key.digits.enumerated() {
                 hk.register(Int(code), win) { MainActor.assumeIsolated { DockApps.activate(n + 1) } }
             }
+        }
+        hk.register(Int(Key.i), win) { MainActor.assumeIsolated { SettingsWindow.shared.show() } }
+        // Ctrl+Shift+Esc opens Task Manager on Windows; Cmd stands in for Ctrl.
+        hk.register(Int(Key.escape), cmdKey | shiftKey) {
+            NSWorkspace.shared.openApplication(at: URL(fileURLWithPath: "/System/Applications/Utilities/Activity Monitor.app"),
+                                               configuration: NSWorkspace.OpenConfiguration())
         }
         hk.register(Int(Key.z), win) {
             MainActor.assumeIsolated {

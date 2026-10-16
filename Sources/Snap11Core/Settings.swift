@@ -20,7 +20,6 @@ enum Settings {
         static let minimizeKeys = "minimize.enabled"
         static let dockNumbers = "dock.numbers"
         static let finderKeys = "finder.keys"
-        static let finderZoom = "finder.zoom"
         static let dockPreviews = "dock.previews"
         static let dockClicks = "dock.clicks"
         static let dockDelay = "dock.delay"
@@ -45,7 +44,6 @@ enum Settings {
             K.minimizeKeys: true,
             K.dockNumbers: true,
             K.finderKeys: true,
-            K.finderZoom: true,
             K.dockPreviews: true,
             K.dockClicks: true,
             K.dockDelay: 0.25,
@@ -70,7 +68,6 @@ enum Settings {
     static var minimizeKeys: Bool { d.bool(forKey: K.minimizeKeys) }
     static var dockNumbers: Bool { d.bool(forKey: K.dockNumbers) }
     static var finderKeys: Bool { d.bool(forKey: K.finderKeys) }
-    static var finderZoom: Bool { d.bool(forKey: K.finderZoom) }
     static var dockPreviews: Bool { d.bool(forKey: K.dockPreviews) }
     static var dockClicks: Bool { d.bool(forKey: K.dockClicks) }
     static var dockDelay: TimeInterval { d.double(forKey: K.dockDelay) }

@@ -44,7 +44,6 @@ private struct GeneralTab: View {
     @AppStorage(Settings.K.minimizeKeys) private var minimizeKeys = true
     @AppStorage(Settings.K.dockNumbers) private var dockNumbers = true
     @AppStorage(Settings.K.finderKeys) private var finderKeys = true
-    @AppStorage(Settings.K.finderZoom) private var finderZoom = true
 
     var body: some View {
         Form {
@@ -65,7 +64,6 @@ private struct GeneralTab: View {
                 Toggle("Finder keys work like Explorer", isOn: $finderKeys)
                 Text("Enter opens, F2 renames, Delete moves to the Trash, Shift+Delete deletes for good after asking, Cmd+X then Cmd+V moves files, Cmd+L types a path. Text fields keep their usual keys.")
                     .font(.caption).foregroundStyle(.secondary)
-                Toggle("Pinch or Cmd+scroll steps from icons to list view", isOn: $finderZoom)
             }
         }
         .formStyle(.grouped)
