@@ -54,6 +54,9 @@ final class AlwaysOnTop {
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.refreshAll() }
         }
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refreshAll() }
+        }
         FocusHistory.shared.onFocus = { [weak self] _ in
             MainActor.assumeIsolated { self?.refreshAll() }
         }
@@ -98,7 +101,10 @@ final class AlwaysOnTop {
     /// The real window when it has focus, the mirror over it otherwise.
     private func refresh(_ pin: Pin) {
         let f = pin.window.frame
-        guard f.width > 0, !pin.window.isMinimized, pin.window.hasElement else {
+        // A panel shown while another Space is up moves to that Space, so a pinned window on
+        // another Space keeps its border and mirror hidden until its Space is back.
+        let onThisSpace = SkyLight.spaces(for: pin.window.id).contains(SkyLight.activeSpace)
+        guard f.width > 0, !pin.window.isMinimized, pin.window.hasElement, onThisSpace else {
             stopMirror(pin)
             pin.border.hide()
             return
