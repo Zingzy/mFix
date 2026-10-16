@@ -72,3 +72,16 @@ import Testing
         #expect(WindowInfo([kCGWindowNumber as String: NSNumber(value: 1), kCGWindowOwnerPID as String: NSNumber(value: 2)]) == nil)
     }
 }
+
+@Suite struct SettingsWindowTests {
+    @Test func chordsReadInMenuOrder() {
+        #expect(chord(SnapKeys.cmdOption.modifiers, "←") == "⌥⌘←")
+        #expect(chord(Hotkey.winAlt | shiftKey, "T") == "⌃⌥⇧⌘T")
+    }
+
+    @Test func searchMatchesTitlesAndSettings() {
+        #expect(SettingsSection.allCases.filter { $0.matches("terminal") } == [.finder])
+        #expect(SettingsSection.allCases.filter { $0.matches("drag") }.contains(.dragDrop))
+        #expect(SettingsSection.allCases.allSatisfy { $0.matches("") })
+    }
+}

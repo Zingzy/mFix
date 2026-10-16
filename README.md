@@ -174,15 +174,20 @@ macOS gives one app no way to lift another app's window above the app in front. 
 
 ## Settings
 
-Click the menu bar icon, then Settings. Every feature has a switch and changes apply at once.
+Click the menu bar icon, then Settings. Every feature has a switch and changes apply at once. Each section also lists its keyboard shortcuts, with the Win keys you picked.
 
-| Tab | What you can change |
+| Section | What you can change |
 |---|---|
-| General | Open at login. Which keys stand for Win. Win+Home and Win+D, Win+1 to 9, Always on Top. Finder keys and which terminal Cmd+Option+T opens. |
+| General | Open at login. Which keys stand for Win. |
 | Snapping | Snap Assist, drag to snap, snap groups, Snap Layouts on hover and the hover delay. |
 | Switcher | Replace Cmd+Tab, all Spaces or this one, the delay before the panel shows, live thumbnails. |
-| Dock | Dock previews and their delay, and click to minimize or cycle. |
+| Desktop | Win+Home and Win+D. |
+| Dock | Dock previews and their delay, click to minimize or cycle, Win+1 to 9. |
 | Drag and drop | The drag preview, Dock spring loading and how long to hold. |
+| Finder | Finder keys and which terminal Cmd+Option+T opens. |
+| Always on Top | Pinning with Cmd+Option+Ctrl+T. |
+| Permissions | Whether Accessibility, Screen Recording and Automation for Finder are granted, with a button to each list in System Settings. |
+| About | Version, source code and license. |
 
 ## What mFix changes on your Mac
 

@@ -6,7 +6,7 @@ import SwiftUI
 /// hotkeys and leaves the system Cmd+Tab alone.
 @MainActor
 public enum RenderCheck {
-    private static var settingsHosts: [NSHostingView<SettingsView>] = []
+    private static var settingsWindows: [(name: String, window: NSWindow)] = []
 
     public static func run(into dir: String) {
         OverlayPanel.offscreen = true
@@ -44,23 +44,31 @@ public enum RenderCheck {
             let anchor = front.fullScreenButtonFrame ?? CGRect(x: 200, y: 40, width: 14, height: 14)
             LayoutFlyout.shared.open(for: front, anchor: anchor, keyboard: true)
         }
-        for tab in 0..<5 {
-            let host = NSHostingView(rootView: SettingsView(tab: tab))
-            host.frame = NSRect(x: 0, y: 0, width: 520, height: 440)
-            let w = NSWindow(contentRect: host.frame, styleMask: [.titled], backing: .buffered, defer: false)
-            w.contentView = host
-            settingsHosts.append(host)
+        // Each section at the window's own size, and tall enough to show the whole page.
+        for (look, appearance) in [("light", NSAppearance.Name.aqua), ("dark", .darkAqua)] {
+            for section in SettingsSection.allCases {
+                for (suffix, height) in [("", SettingsWindow.size.height), ("-full", 1100)] {
+                    let w = SettingsWindow.make(SettingsView(pinned: section))
+                    w.appearance = NSAppearance(named: appearance)
+                    w.setContentSize(NSSize(width: SettingsWindow.size.width, height: height))
+                    // Ordered in so the split view and its glass draw, but below the wallpaper.
+                    w.level = NSWindow.Level(Int(CGWindowLevelForKey(.desktopWindow)) - 1)
+                    w.ignoresMouseEvents = true
+                    w.orderFrontRegardless()
+                    settingsWindows.append(("settings-\(look)-\(section.rawValue)\(suffix)", w))
+                }
+            }
         }
         // Thumbnails arrive asynchronously; give them a moment before drawing.
         onMain(after: 2.5) {
             write(Switcher.shared.panel, to: "\(dir)/switcher.png")
             write(SnapAssist.shared.panel, to: "\(dir)/snap-assist.png")
             write(LayoutFlyout.shared.panel, to: "\(dir)/flyout.png")
-            for (i, host) in settingsHosts.enumerated() {
-                host.layoutSubtreeIfNeeded()
-                guard let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { continue }
-                host.cacheDisplay(in: host.bounds, to: rep)
-                try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: "\(dir)/settings-\(i).png"))
+            for (name, w) in settingsWindows {
+                guard let image = SkyLight.captureWindow(CGWindowID(w.windowNumber)) else { print("no capture:", name); continue }
+                try? NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])?
+                    .write(to: URL(fileURLWithPath: "\(dir)/\(name).png"))
+                print("wrote", name, w.frame.size)
             }
             NSApp.terminate(nil)
         }
