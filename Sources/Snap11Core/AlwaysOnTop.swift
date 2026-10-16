@@ -20,6 +20,9 @@ final class AlwaysOnTop {
         var stream: SCStream?
         var output: FrameSink?
         var starting = false
+        /// Set when the person asks it to close, so the border goes before the window's own
+        /// close finishes; cleared if the window is still there a second later.
+        var closing: Date?
 
         init(window: AXWindow) { self.window = window }
     }
@@ -28,9 +31,10 @@ final class AlwaysOnTop {
         didSet { watchClosing() }
     }
     private var closeWatch: Timer?
+    private var closeTap: ListenTap?
 
-    /// Some apps report a closed window late; WindowServer knows at once. Only runs while
-    /// something is pinned.
+    /// Some apps report a closed window late, and some keep it alive hidden; WindowServer
+    /// knows at once that it is no longer shown. Only runs while something is pinned.
     private func watchClosing() {
         if pins.isEmpty {
             closeWatch?.invalidate()
@@ -38,19 +42,57 @@ final class AlwaysOnTop {
             return
         }
         guard closeWatch == nil else { return }
-        closeWatch = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
+        closeWatch = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                for (id, pin) in self.pins where (CGWindowListCopyWindowInfo(.optionIncludingWindow, id) as? [[String: Any]] ?? []).isEmpty {
+                let gone = self.pins.filter { id, pin in
+                    (CGWindowListCopyWindowInfo(.optionIncludingWindow, id) as? [[String: Any]] ?? []).isEmpty
+                        || (!SkyLight.isOrderedIn(id) && !pin.window.isMinimized && !(pin.window.app?.isHidden ?? false))
+                }
+                for (id, pin) in gone {
                     self.stopMirror(pin)
                     pin.border.hide()
                     self.pins[id] = nil
+                }
+                for pin in self.pins.values {
+                    if let t = pin.closing, Date().timeIntervalSince(t) > 1 {
+                        pin.closing = nil
+                        self.refresh(pin)
+                    }
                 }
             }
         }
     }
 
+    /// The red button or Cmd+W on a pinned window: take the border away now.
+    private func closeAsked(_ type: CGEventType, _ event: CGEvent) {
+        if type == .leftMouseUp {
+            let p = event.location
+            for pin in pins.values {
+                guard let button: AXUIElement = pin.window.element?.attr(kAXCloseButtonAttribute),
+                      let o = button.point(kAXPositionAttribute), let s = button.size(kAXSizeAttribute),
+                      CGRect(origin: o, size: s).insetBy(dx: -2, dy: -2).contains(p) else { continue }
+                closing(pin)
+            }
+        } else if event.getIntegerValueField(.keyboardEventKeycode) == Key.w,
+                  event.flags.intersection([.maskCommand, .maskShift, .maskAlternate, .maskControl]) == .maskCommand,
+                  let front = AXWindow.focused(), let pin = pins[front.id] {
+            closing(pin)
+        }
+    }
+
+    private func closing(_ pin: Pin) {
+        pin.closing = Date()
+        stopMirror(pin)
+        pin.border.hide()
+    }
+
     func start() {
+        let tap = ListenTap([.leftMouseUp, .keyDown]) { [weak self] type, event in
+            MainActor.assumeIsolated { if self?.pins.isEmpty == false { self?.closeAsked(type, event) } }
+        }
+        tap.start()
+        closeTap = tap
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.refreshAll() }
         }
@@ -65,6 +107,8 @@ final class AlwaysOnTop {
     var pinnedIDs: Set<CGWindowID> { Set(pins.keys) }
 
     func isMirrored(_ id: CGWindowID) -> Bool { pins[id]?.mirror.isVisible ?? false }
+
+    func hasBorder(_ id: CGWindowID) -> Bool { pins[id]?.border.isVisible ?? false }
 
     func toggleFocused() {
         guard let w = AXWindow.focused(), w.id != 0, !w.isFullScreen else { return }
@@ -81,7 +125,7 @@ final class AlwaysOnTop {
         pin.border.ignoresMouseEvents = true
         pin.border.level = NSWindow.Level(rawValue: NSWindow.Level.floating.rawValue + 1)
         let border = BorderView()
-        border.radius = (WindowCorners.radius(of: w.id, frameWidth: w.frame.width) ?? 16) + 1.5
+        border.radii = WindowCorners.radii(of: w.id, frameWidth: w.frame.width) ?? .fallback
         pin.border.contentView = border
         // On the pinned window's own Space only, as a pinned window stays on its own desktop
         // on Windows; the panels join the Space they first appear on.
@@ -100,6 +144,7 @@ final class AlwaysOnTop {
 
     /// The real window when it has focus, the mirror over it otherwise.
     private func refresh(_ pin: Pin) {
+        if pin.closing != nil { return }
         let f = pin.window.frame
         // A panel shown while another Space is up moves to that Space, so a pinned window on
         // another Space keeps its border and mirror hidden until its Space is back.
@@ -111,7 +156,7 @@ final class AlwaysOnTop {
         }
         let inFront = AXWindow.focused().map { $0.id == pin.window.id } ?? false
         pin.border.appearance = Theme.appearance
-        pin.border.show(frame: Geo.flip(f.insetBy(dx: -3, dy: -3)))
+        pin.border.show(frame: Geo.flip(f))
         if inFront {
             stopMirror(pin)
         } else {
@@ -197,12 +242,28 @@ final class AlwaysOnTop {
 
     // MARK: Views
 
-    /// An accent outline following the window's own corners, its stroke 1.5 pt outside them.
+    /// An accent outline just inside the window's edge, following its own four corners; inside
+    /// so that no part of it runs under the Dock or off the screen.
     private final class BorderView: NSView {
-        var radius: CGFloat = 17.5
+        var radii = WindowCorners.Radii.fallback
+
+        override var isFlipped: Bool { true }
 
         override func draw(_ dirtyRect: NSRect) {
-            let path = NSBezierPath(roundedRect: bounds.insetBy(dx: 1.5, dy: 1.5), xRadius: radius, yRadius: radius)
+            let r = bounds.insetBy(dx: 1.5, dy: 1.5)
+            let (tl, tr, bl, br) = (max(radii.topLeft - 1.5, 0), max(radii.topRight - 1.5, 0),
+                                    max(radii.bottomLeft - 1.5, 0), max(radii.bottomRight - 1.5, 0))
+            let path = NSBezierPath()
+            path.move(to: CGPoint(x: r.minX + tl, y: r.minY))
+            path.line(to: CGPoint(x: r.maxX - tr, y: r.minY))
+            path.appendArc(withCenter: CGPoint(x: r.maxX - tr, y: r.minY + tr), radius: tr, startAngle: 270, endAngle: 360)
+            path.line(to: CGPoint(x: r.maxX, y: r.maxY - br))
+            path.appendArc(withCenter: CGPoint(x: r.maxX - br, y: r.maxY - br), radius: br, startAngle: 0, endAngle: 90)
+            path.line(to: CGPoint(x: r.minX + bl, y: r.maxY))
+            path.appendArc(withCenter: CGPoint(x: r.minX + bl, y: r.maxY - bl), radius: bl, startAngle: 90, endAngle: 180)
+            path.line(to: CGPoint(x: r.minX, y: r.minY + tl))
+            path.appendArc(withCenter: CGPoint(x: r.minX + tl, y: r.minY + tl), radius: tl, startAngle: 180, endAngle: 270)
+            path.close()
             path.lineWidth = 3
             NSColor.controlAccentColor.setStroke()
             path.stroke()

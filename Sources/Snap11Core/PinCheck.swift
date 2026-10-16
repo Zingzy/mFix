@@ -6,7 +6,7 @@ import AppKit
 public enum PinCheck {
     public static func run() {
         // Which app is in front is what this checks, so the person's own clicks would spoil it.
-        CheckGuard.begin()
+        if ProcessInfo.processInfo.environment["SNAP11_CHECK_NOW"] == nil { CheckGuard.begin() }
         Settings.register()
         let apps = (0..<2).map { _ -> Process in
             let p = Process()
@@ -98,6 +98,19 @@ public enum PinCheck {
         AlwaysOnTop.shared.toggle(pinned)
         RunLoop.current.run(until: Date().addingTimeInterval(0.3))
         check(!AlwaysOnTop.shared.isMirrored(pinned.id), "unpinned, the mirror is gone")
+
+        AlwaysOnTop.shared.toggle(pinned)
+        pinned.focus()
+        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+        check(AlwaysOnTop.shared.hasBorder(pinned.id), "pinned again, the border shows")
+        pinned.close()
+        for t in [0.05, 0.15, 0.35] {
+            RunLoop.current.run(until: Date().addingTimeInterval(t == 0.05 ? 0.05 : t == 0.15 ? 0.1 : 0.2))
+            let listed = !(CGWindowListCopyWindowInfo(.optionIncludingWindow, pinned.id) as? [[String: Any]] ?? []).isEmpty
+            print("     \(t) s after close: listed \(listed), ordered in \(SkyLight.isOrderedIn(pinned.id)), minimized \(pinned.isMinimized), border \(AlwaysOnTop.shared.hasBorder(pinned.id))")
+        }
+        check(!AlwaysOnTop.shared.hasBorder(pinned.id) && !AlwaysOnTop.shared.pinnedIDs.contains(pinned.id),
+              "closing the pinned window takes the border away within 0.35 s")
 
     }
 }

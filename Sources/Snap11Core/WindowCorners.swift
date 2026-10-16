@@ -1,33 +1,49 @@
 import AppKit
 
-/// A window's corner radius as macOS draws it, which on macOS 26 depends on the window's
-/// style. Read off a snapshot: from the top-left corner, the first opaque pixel along the
-/// diagonal sits r * (1 - 1/sqrt 2) in from each edge of a corner of radius r.
+/// A window's corner radii as drawn, which on macOS 26 depend on the window's style and in
+/// some apps (Arc) differ between top and bottom. Read off a snapshot: walking the diagonal
+/// in from a corner, alpha crosses half r * (1 - 1/sqrt 2) in from each edge of a corner of
+/// radius r.
 public enum WindowCorners {
-    public static func radius(of id: CGWindowID, frameWidth: CGFloat) -> CGFloat? {
-        guard frameWidth > 0, let image = SkyLight.captureWindow(id), image.width > 32, image.height > 32,
-              let data = image.dataProvider?.data, let bytes = CFDataGetBytePtr(data) else { return nil }
-        let bpp = image.bitsPerPixel / 8
-        guard bpp == 4 else { return nil }
-        let alphaFirst = [.premultipliedFirst, .first].contains(CGImageAlphaInfo(rawValue: image.bitmapInfo.rawValue & CGBitmapInfo.alphaInfoMask.rawValue))
-        let alphaIndex = alphaFirst ? (image.bitmapInfo.contains(.byteOrder32Little) ? 3 : 0) : (image.bitmapInfo.contains(.byteOrder32Little) ? 0 : 3)
-        let scale = CGFloat(image.width) / frameWidth
-        func alpha(_ d: Int) -> CGFloat { CGFloat(bytes[d * image.bytesPerRow + d * bpp + alphaIndex]) }
-        for d in 0..<min(image.width, image.height, 120) where alpha(d) > 128 {
-            guard d > 0 else { return 0 }
-            // Where alpha crosses half between the last clear pixel and the first solid one.
-            let edge = CGFloat(d - 1) + (128 - alpha(d - 1)) / max(alpha(d) - alpha(d - 1), 1)
-            return ((edge + 0.5) / scale / (1 - 1 / 2.0.squareRoot()) * 2).rounded() / 2
-        }
-        return nil
+    public struct Radii: Equatable {
+        public var topLeft, topRight, bottomLeft, bottomRight: CGFloat
+
+        static let fallback = Radii(topLeft: 16, topRight: 16, bottomLeft: 16, bottomRight: 16)
     }
 
-    /// `Snap11 --corners`: every window's measured radius, to check the measuring.
+    public static func radii(of id: CGWindowID, frameWidth: CGFloat) -> Radii? {
+        guard frameWidth > 0, let image = SkyLight.captureWindow(id), image.width > 64, image.height > 64,
+              image.bitsPerPixel == 32, let data = image.dataProvider?.data, let bytes = CFDataGetBytePtr(data) else { return nil }
+        let info = CGImageAlphaInfo(rawValue: image.bitmapInfo.rawValue & CGBitmapInfo.alphaInfoMask.rawValue)
+        let little = image.bitmapInfo.contains(.byteOrder32Little)
+        let alphaFirst = info == .premultipliedFirst || info == .first
+        let a = alphaFirst ? (little ? 3 : 0) : (little ? 0 : 3)
+        let scale = CGFloat(image.width) / frameWidth
+        func alpha(_ x: Int, _ y: Int) -> CGFloat { CGFloat(bytes[y * image.bytesPerRow + x * 4 + a]) }
+        func corner(_ dx: Int, _ dy: Int) -> CGFloat? {
+            let x0 = dx > 0 ? 0 : image.width - 1, y0 = dy > 0 ? 0 : image.height - 1
+            var last: CGFloat = 0
+            for d in 0..<min(image.width, image.height, 120) {
+                let v = alpha(x0 + d * dx, y0 + d * dy)
+                if v > 128 {
+                    guard d > 0 else { return 0 }
+                    let edge = CGFloat(d - 1) + (128 - last) / max(v - last, 1)
+                    return ((edge + 0.5) / scale / (1 - 1 / 2.0.squareRoot()) * 2).rounded() / 2
+                }
+                last = v
+            }
+            return nil
+        }
+        guard let tl = corner(1, 1), let tr = corner(-1, 1), let bl = corner(1, -1), let br = corner(-1, -1) else { return nil }
+        return Radii(topLeft: tl, topRight: tr, bottomLeft: bl, bottomRight: br)
+    }
+
+    /// `Snap11 --corners`: every window's measured radii, to check the measuring.
     @MainActor
     public static func report() {
         for w in WindowList.allSpaces() {
-            let r = radius(of: w.id, frameWidth: w.frame.width)
-            print(w.app?.localizedName ?? "?", "|", w.title.prefix(30), "| radius", r.map { "\(Int($0)) pt" } ?? "unknown")
+            let r = radii(of: w.id, frameWidth: w.frame.width)
+            print(w.app?.localizedName ?? "?", "| radii", r.map { "tl \($0.topLeft) tr \($0.topRight) bl \($0.bottomLeft) br \($0.bottomRight)" } ?? "unknown")
         }
         exit(0)
     }
