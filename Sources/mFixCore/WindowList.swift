@@ -35,9 +35,10 @@ enum WindowList {
         let space = SkyLight.activeSpace
         var visible: [CGWindowID: AXWindow] = [:]
         var tail: [AXWindow] = []
+        let listed = AXWindow.windows(of: pids, wait: 0.08)
         for pid in pids {
             let hidden = NSRunningApplication(processIdentifier: pid)?.isHidden ?? false
-            for w in AXWindow.windows(of: pid) where w.id != 0 && w.isStandard && !excluding.contains(w.id) {
+            for w in listed[pid] ?? [] where w.id != 0 && w.isStandard && !excluding.contains(w.id) {
                 if zOrder.contains(w.id) {
                     visible[w.id] = w
                 } else if w.isMinimized || hidden {
@@ -70,31 +71,12 @@ enum WindowList {
         let own = ProcessInfo.processInfo.processIdentifier
         let regular = Set(NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular }.map(\.processIdentifier))
         var elsewhere: [AXWindow] = []
-        // AX lists only this Space's windows, but an app's main and focused window come back
-        // from any Space. With that element the focus can raise it, which is what makes macOS
-        // follow to its Space for apps like Discord where fronting the process alone doesn't.
-        var reachable: [pid_t: [CGWindowID: AXUIElement]] = [:]
-        func element(pid: pid_t, id: CGWindowID) -> AXUIElement? {
-            if reachable[pid] == nil {
-                let app = AXUIElementCreateApplication(pid)
-                AXUIElementSetMessagingTimeout(app, 0.25)
-                var found: [CGWindowID: AXUIElement] = [:]
-                for name in [kAXMainWindowAttribute, kAXFocusedWindowAttribute] {
-                    guard let e: AXUIElement = app.attr(name) else { continue }
-                    var wid: CGWindowID = 0
-                    _AXUIElementGetWindow(e, &wid)
-                    found[wid] = e
-                }
-                reachable[pid] = found
-            }
-            return reachable[pid]?[id]
-        }
         for w in WindowInfo.list([.optionAll, .excludeDesktopElements]) {
             guard w.layer == 0, !known.contains(w.id), w.pid != own, regular.contains(w.pid), only == nil || only == w.pid,
                   allowed?.contains(w.pid) ?? true,
                   w.alpha > 0, w.bounds.width >= 100, w.bounds.height >= 100,
                   !SkyLight.spaces(for: w.id).isEmpty, SkyLight.isOrderedIn(w.id) else { continue }
-            if let e = element(pid: w.pid, id: w.id) ?? RemoteWindows.shared.element(for: w.id) {
+            if let e = RemoteWindows.shared.element(for: w.id) {
                 elsewhere.append(AXWindow(element: e, pid: w.pid))
             } else {
                 elsewhere.append(AXWindow(offSpace: w.id, pid: w.pid, title: w.name ?? "", frame: w.bounds))

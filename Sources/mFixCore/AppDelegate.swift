@@ -8,6 +8,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
     public func applicationDidFinishLaunching(_ note: Notification) {
         installExitHandlers()
+        AXWindow.limitWaits()
         AXIsProcessTrustedWithOptions(["AXTrustedCheckOptionPrompt": true] as CFDictionary)
         if !Thumbnails.permitted { CGRequestScreenCaptureAccess() }
         setUpStatusItem()

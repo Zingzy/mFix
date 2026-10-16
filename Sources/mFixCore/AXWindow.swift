@@ -120,9 +120,7 @@ final class AXWindow: Hashable {
         if !fronted {
             app?.activate(options: [])
         }
-        if let element {
-            AXUIElementPerformAction(element, kAXRaiseAction as CFString)
-        } else if let e = RemoteWindows.shared.find(pid: pid, id: id) {
+        if let e = element ?? reach() {
             AXUIElementPerformAction(e, kAXRaiseAction as CFString)
         } else {
             // Fronting switched Space; once there the window has an AX element to raise.
@@ -135,8 +133,23 @@ final class AXWindow: Hashable {
         }
     }
 
+    /// A window on another Space has no element from the window list. AX lists only this
+    /// Space's windows, but an app's main and focused window come back from any Space, and
+    /// raising that element is what makes macOS follow to its Space for apps like Discord.
+    /// Looked up only when needed: asking every app while listing was slow once apps napped.
+    private func reach() -> AXUIElement? {
+        let app = AXUIElementCreateApplication(pid)
+        for name in [kAXMainWindowAttribute, kAXFocusedWindowAttribute] {
+            guard let e: AXUIElement = app.attr(name) else { continue }
+            var wid: CGWindowID = 0
+            _AXUIElementGetWindow(e, &wid)
+            if wid == id { return e }
+        }
+        return RemoteWindows.shared.find(pid: pid, id: id)
+    }
+
     func close() {
-        guard let button: AXUIElement = element?.attr(kAXCloseButtonAttribute) else { return }
+        guard let button: AXUIElement = (element ?? reach())?.attr(kAXCloseButtonAttribute) else { return }
         AXUIElementPerformAction(button, kAXPressAction as CFString)
     }
 
@@ -158,10 +171,64 @@ final class AXWindow: Hashable {
         return nil
     }
 
-    static func windows(of pid: pid_t) -> [AXWindow] {
-        let appElement = AXUIElementCreateApplication(pid)
-        let list: [AXUIElement] = appElement.attr(kAXWindowsAttribute) ?? []
-        return list.map { AXWindow(element: $0, pid: pid) }
+    /// Apps that let an AX call time out. They are asked again off the main thread until they
+    /// answer, so a hung app (Caffeine, a WebKit helper) costs one timeout, not one per list.
+    private nonisolated(unsafe) static var stalledPIDs: Set<pid_t> = []
+    private static let stalledLock = NSLock()
+
+
+    /// One stuck app must not freeze the main thread: every AX call from this process gives up
+    /// after this long. Healthy apps answer in a few ms.
+    static func limitWaits() {
+        AXUIElementSetMessagingTimeout(AXUIElementCreateSystemWide(), 0.3)
+    }
+
+    private nonisolated static func waitForAnswer(_ pid: pid_t) {
+        let app = AXUIElementCreateApplication(pid)
+        var value: CFTypeRef?
+        repeat { sleep(2) } while NSRunningApplication(processIdentifier: pid) != nil
+            && AXUIElementCopyAttributeValue(app, kAXWindowsAttribute as CFString, &value) == .cannotComplete
+        stalledLock.withLock { _ = stalledPIDs.remove(pid) }
+    }
+
+    static func windows(of pid: pid_t) -> [AXWindow] { windows(of: [pid])[pid] ?? [] }
+
+    /// Every app's last answer, for an app too slow to answer this time.
+    private nonisolated(unsafe) static var lastAnswer: [pid_t: [AXUIElement]] = [:]
+
+    /// Every app is asked at once. An app that hasn't answered within `wait` (macOS naps apps
+    /// after a long idle) is listed with its last answer, and its real one lands in the cache
+    /// for next time, so opening the switcher never waits out a napping app.
+    static func windows(of pids: [pid_t], wait: TimeInterval = 0.3) -> [pid_t: [AXWindow]] {
+        let stalled = stalledLock.withLock { stalledPIDs }
+        let asked = pids.filter { !stalled.contains($0) }
+        let group = DispatchGroup()
+        var answered: Set<pid_t> = []
+        for pid in asked {
+            DispatchQueue.global(qos: .userInteractive).async(group: group) {
+                var value: CFTypeRef?
+                let err = AXUIElementCopyAttributeValue(AXUIElementCreateApplication(pid), kAXWindowsAttribute as CFString, &value)
+                stalledLock.withLock {
+                    if err == .cannotComplete {
+                        stalledPIDs.insert(pid)
+                        lastAnswer[pid] = nil
+                    } else {
+                        lastAnswer[pid] = value as? [AXUIElement] ?? []
+                    }
+                    answered.insert(pid)
+                }
+                if err == .cannotComplete { waitForAnswer(pid) }
+            }
+        }
+        let late = group.wait(timeout: .now() + wait) == .timedOut
+        let (answers, inTime) = stalledLock.withLock { (lastAnswer, answered) }
+        if late && Hotkeys.debug {
+            let slow = asked.filter { !inTime.contains($0) }.map { NSRunningApplication(processIdentifier: $0)?.localizedName ?? "\($0)" }
+            NSLog("mFix: window list went on without %@", slow.joined(separator: ", "))
+        }
+        var result: [pid_t: [AXWindow]] = [:]
+        for pid in asked { result[pid] = (answers[pid] ?? []).map { AXWindow(element: $0, pid: pid) } }
+        return result
     }
 }
 
