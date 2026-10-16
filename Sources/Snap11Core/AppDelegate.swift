@@ -19,6 +19,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         LayoutFlyout.shared.start()
         DragSnap.shared.start()
         DragDrop.shared.start()
+        FinderKeys.shared.start()
         Settings.register()
         SystemShortcuts.recoverAfterCrash()
         registerHotkeys()
@@ -66,7 +67,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private var keySettings: [String] {
-        [Settings.snapKeys.rawValue, "\(Settings.switcher)", "\(Settings.minimizeKeys)"]
+        [Settings.snapKeys.rawValue, "\(Settings.switcher)", "\(Settings.minimizeKeys)", "\(Settings.dockNumbers)"]
     }
 
     private func registerHotkeys() {
@@ -104,6 +105,11 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         if Settings.minimizeKeys {
             hk.register(Int(Key.home), win) { MainActor.assumeIsolated { MinimizeAll.shared.toggle(keepActive: true) } }
             hk.register(Int(Key.d), win) { MainActor.assumeIsolated { MinimizeAll.shared.toggle(keepActive: false) } }
+        }
+        if Settings.dockNumbers {
+            for (n, code) in Key.digits.enumerated() {
+                hk.register(Int(code), win) { MainActor.assumeIsolated { DockApps.activate(n + 1) } }
+            }
         }
         hk.register(Int(Key.z), win) {
             MainActor.assumeIsolated {

@@ -11,6 +11,8 @@ public enum DriveCheck {
         // Hardware arrow keys always carry the numeric-pad and Fn bits.
         let arrow = [Key.left, Key.right, Key.up, Key.down].contains(code)
         e?.flags = arrow ? flags.union([.maskNumericPad, .maskSecondaryFn]) : flags
+        CheckGuard.poll()
+        CheckGuard.mark(e)
         e?.post(tap: .cghidEventTap)
         usleep(30_000)
     }
@@ -19,6 +21,7 @@ public enum DriveCheck {
         let e = CGEvent(source: source)
         e?.type = .flagsChanged
         e?.flags = flags
+        CheckGuard.mark(e)
         e?.post(tap: .cghidEventTap)
         usleep(30_000)
     }
@@ -71,11 +74,14 @@ public enum DriveCheck {
     private static func mouse(_ type: CGEventType, _ p: CGPoint) {
         let e = CGEvent(mouseEventSource: source, mouseType: type, mouseCursorPosition: p, mouseButton: .left)
         if type == .leftMouseDown || type == .leftMouseUp { e?.setIntegerValueField(.mouseEventClickState, value: 1) }
+        CheckGuard.poll()
+        CheckGuard.mark(e)
         e?.post(tap: .cghidEventTap)
         usleep(30_000)
     }
 
     public static func run(snap11 pid: pid_t) {
+        CheckGuard.begin()
         let child = Process()
         child.executableURL = URL(fileURLWithPath: CommandLine.arguments[0])
         child.arguments = ["--test-window"]

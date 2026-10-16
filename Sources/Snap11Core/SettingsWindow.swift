@@ -41,6 +41,8 @@ private struct GeneralTab: View {
     @State private var launchAtLogin = Settings.launchAtLogin
     @AppStorage(Settings.K.snapKeys) private var snapKeys = SnapKeys.cmdOption.rawValue
     @AppStorage(Settings.K.minimizeKeys) private var minimizeKeys = true
+    @AppStorage(Settings.K.dockNumbers) private var dockNumbers = true
+    @AppStorage(Settings.K.finderKeys) private var finderKeys = true
 
     var body: some View {
         Form {
@@ -55,6 +57,12 @@ private struct GeneralTab: View {
                 Text("Stands in for the Windows key in every Win shortcut: Win+Arrow, Win+Z, Win+Home, Win+D.")
                     .font(.caption).foregroundStyle(.secondary)
                 Toggle("Win+Home minimizes other windows, Win+D shows the desktop", isOn: $minimizeKeys)
+                Toggle("Win+1 to 9 open or switch to the apps in the Dock", isOn: $dockNumbers)
+            }
+            Section {
+                Toggle("Finder keys work like Explorer", isOn: $finderKeys)
+                Text("Enter opens, F2 renames, Delete moves to the Trash, Shift+Delete deletes for good after asking, Cmd+X then Cmd+V moves files, Cmd+L types a path. Text fields keep their usual keys.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)

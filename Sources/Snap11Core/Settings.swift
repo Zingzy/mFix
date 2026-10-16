@@ -18,6 +18,8 @@ enum Settings {
         static let dockSpring = "drag.dockSpring"
         static let springDelay = "drag.springDelay"
         static let minimizeKeys = "minimize.enabled"
+        static let dockNumbers = "dock.numbers"
+        static let finderKeys = "finder.keys"
     }
 
     static func register() {
@@ -35,6 +37,8 @@ enum Settings {
             K.dockSpring: true,
             K.springDelay: 0.5,
             K.minimizeKeys: true,
+            K.dockNumbers: true,
+            K.finderKeys: true,
         ])
     }
 
@@ -52,6 +56,8 @@ enum Settings {
     static var dockSpring: Bool { d.bool(forKey: K.dockSpring) }
     static var springDelay: TimeInterval { d.double(forKey: K.springDelay) }
     static var minimizeKeys: Bool { d.bool(forKey: K.minimizeKeys) }
+    static var dockNumbers: Bool { d.bool(forKey: K.dockNumbers) }
+    static var finderKeys: Bool { d.bool(forKey: K.finderKeys) }
 
     /// Launch at login lives with the system, not in UserDefaults.
     static var launchAtLogin: Bool {

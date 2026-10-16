@@ -112,18 +112,7 @@ final class DragDrop {
     private func readDock(force: Bool = false) {
         guard force || Date().timeIntervalSince(dockRead) > 1 else { return }
         dockRead = Date()
-        dockItems = []
-        guard let dock = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock").first else { return }
-        let app = AXUIElementCreateApplication(dock.processIdentifier)
-        AXUIElementSetMessagingTimeout(app, 0.2)
-        for list in (app.attr(kAXChildrenAttribute) as [AXUIElement]?) ?? [] {
-            for item in (list.attr(kAXChildrenAttribute) as [AXUIElement]?) ?? [] {
-                guard (item.attr(kAXSubroleAttribute) as String?) == "AXApplicationDockItem",
-                      let url: URL = item.attr(kAXURLAttribute),
-                      let pos = item.point(kAXPositionAttribute), let size = item.size(kAXSizeAttribute) else { continue }
-                dockItems.append((CGRect(origin: pos, size: size), url))
-            }
-        }
+        dockItems = DockItems.read().map { ($0.frame, $0.url) }
     }
 
     private func spring(at p: CGPoint) {
@@ -146,8 +135,7 @@ final class DragDrop {
     }
 
     private func bringForward(appAt url: URL) {
-        guard let app = NSWorkspace.shared.runningApplications.first(where: { $0.bundleURL?.standardizedFileURL == url.standardizedFileURL })
-        else { return }
+        guard let app = DockItems.Item(frame: .zero, url: url, title: "").runningApp else { return }
         // Not running: leave it to the Dock, which opens the dropped item with the app.
         if let window = WindowList.allSpaces().first(where: { $0.pid == app.processIdentifier }) {
             window.focus()
