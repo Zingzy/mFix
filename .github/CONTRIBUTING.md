@@ -13,7 +13,7 @@ scripts/build.sh     # build/mFix.app, signed
 scripts/dmg.sh       # build/mFix.dmg
 ```
 
-`scripts/build.sh` signs ad hoc unless you have a signing certificate set up. Each ad hoc build has a new signature, so macOS asks for Accessibility and Screen Recording again after every rebuild. A self-signed certificate fixes that. See [docs/releasing.md](docs/releasing.md).
+`scripts/build.sh` signs ad hoc unless you have a signing certificate set up. Each ad hoc build has a new signature, so macOS asks for Accessibility and Screen Recording again after every rebuild. A self-signed certificate fixes that. See [docs/releasing.md](../docs/releasing.md).
 
 ## Running it
 

@@ -1,6 +1,6 @@
 # mFix
 
-[![Release](https://img.shields.io/github/v/release/Zingzy/mFix)](https://github.com/Zingzy/mFix/releases/latest) [![Downloads](https://img.shields.io/github/downloads/Zingzy/mFix/total)](https://github.com/Zingzy/mFix/releases) [![CI](https://img.shields.io/github/actions/workflow/status/Zingzy/mFix/ci.yml?branch=main&label=CI)](https://github.com/Zingzy/mFix/actions/workflows/ci.yml) [![License](https://img.shields.io/github/license/Zingzy/mFix)](LICENSE) ![macOS 26+](https://img.shields.io/badge/macOS-26%2B-000000?logo=apple&logoColor=white) ![Swift 6](https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white)
+[![Release](https://img.shields.io/github/v/release/Zingzy/mFix)](https://github.com/Zingzy/mFix/releases/latest) [![Downloads](https://img.shields.io/github/downloads/Zingzy/mFix/total)](https://github.com/Zingzy/mFix/releases) [![CI](https://img.shields.io/github/actions/workflow/status/Zingzy/mFix/ci.yml?branch=main&label=CI)](https://github.com/Zingzy/mFix/actions/workflows/ci.yml) [![License](https://img.shields.io/github/license/Zingzy/mFix)](.github/LICENSE) ![macOS 26+](https://img.shields.io/badge/macOS-26%2B-000000?logo=apple&logoColor=white) ![Swift 6](https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white)
 
 mFix: the Mac, fixed.
 
@@ -197,7 +197,7 @@ mFix also uses private macOS functions for things no public API does, like captu
 
 ## Privacy
 
-Nothing leaves your Mac. mFix has no networking code, no telemetry, no analytics, no update checks and no accounts. Window thumbnails stay in memory and are never written to disk. The full list is in [PRIVACY.md](PRIVACY.md).
+Nothing leaves your Mac. mFix has no networking code, no telemetry, no analytics, no update checks and no accounts. Window thumbnails stay in memory and are never written to disk. The full list is in [PRIVACY.md](.github/PRIVACY.md).
 
 ## Uninstall
 
@@ -214,7 +214,7 @@ scripts/build.sh     # build/mFix.app
 scripts/dmg.sh       # build/mFix.dmg
 ```
 
-`scripts/build.sh` signs ad hoc unless it finds a signing certificate. An ad hoc build gets a new signature every time, so macOS asks for the permissions again after each rebuild. [docs/releasing.md](docs/releasing.md) shows how to sign with a stable certificate. [CONTRIBUTING.md](CONTRIBUTING.md) covers the in-process checks.
+`scripts/build.sh` signs ad hoc unless it finds a signing certificate. An ad hoc build gets a new signature every time, so macOS asks for the permissions again after each rebuild. [docs/releasing.md](docs/releasing.md) shows how to sign with a stable certificate. [CONTRIBUTING.md](.github/CONTRIBUTING.md) covers the in-process checks.
 
 ## Not affiliated
 
@@ -222,4 +222,4 @@ mFix is not affiliated with, endorsed by or sponsored by Microsoft or Apple. Win
 
 ## License
 
-[MIT](LICENSE)
+[MIT](.github/LICENSE)

@@ -2,7 +2,7 @@
 
 ## Cutting a release
 
-1. Add the version's entry to `CHANGELOG.md` and merge it to `main`.
+1. Add the version's entry to `.github/CHANGELOG.md` and merge it to `main`.
 2. Tag `main` and push the tag:
 
    ```sh
