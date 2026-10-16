@@ -50,6 +50,8 @@ final class Switcher {
     private var selected = 0
     private var sticky = false
     private var showTimer: Timer?
+    private var dragHoverTimer: Timer?
+    private var dragHoverIndex: Int?
     private var generation = 0
     private(set) var isOpen = false
 
@@ -73,6 +75,11 @@ final class Switcher {
         if Hotkeys.debug { NSLog("Snap11: switcher windows %d", windows.count) }
         guard !windows.isEmpty else { return }
         isOpen = true
+        // Mid-drag the panel must not take the keyboard, or the drag can drop out from under
+        // the pointer; Tab still steps through the hotkey and Cmd-up still commits.
+        let dragging = DragDrop.shared.isDragging
+        panel.takesKeyboard = !dragging
+        panel.becomesKeyOnlyIfNeeded = dragging
         self.sticky = sticky
         generation += 1
         selected = windows.count > 1 ? (backward ? windows.count - 1 : 1) : 0
@@ -155,6 +162,39 @@ final class Switcher {
         content.scrollToVisible(frame.insetBy(dx: -24, dy: -24))
     }
 
+    // MARK: Dragging
+
+    /// Holding a drag over a card for half a second switches to that window, so the drop can
+    /// land in it.
+    func dragMoved(to p: CGPoint) {
+        guard isOpen, panel.isVisible else { return }
+        let point = Geo.flip(p)
+        let hit = cards.firstIndex { card in
+            guard let w = card.window else { return false }
+            return w.convertToScreen(card.convert(card.bounds, to: nil)).contains(point)
+        }
+        guard hit != dragHoverIndex else { return }
+        dragHoverIndex = hit
+        dragHoverTimer?.invalidate()
+        dragHoverTimer = nil
+        guard let hit else { return }
+        selected = hit
+        updateRing()
+        let g = generation
+        dragHoverTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.generation == g, self.dragHoverIndex == hit else { return }
+                self.commit()
+            }
+        }
+    }
+
+    func dragEnded() {
+        dragHoverTimer?.invalidate()
+        dragHoverTimer = nil
+        dragHoverIndex = nil
+    }
+
     // MARK: Ending
 
     private func commit() {
@@ -170,6 +210,7 @@ final class Switcher {
 
     private func close() {
         Hotkeys.shared.stopRepeating()
+        dragEnded()
         isOpen = false
         sticky = false
         showTimer?.invalidate()

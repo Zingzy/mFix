@@ -10,6 +10,7 @@ public enum SnapCheck {
         let w = NSWindow(contentRect: NSRect(x: 300, y: 300, width: 600, height: 400),
                          styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         w.title = "Snap11 check"
+        w.contentView = DragSourceView()
         w.makeKeyAndOrderFront(nil)
         NSApp.activate()
         objc_setAssociatedObject(NSApp!, "testWindow", w, .OBJC_ASSOCIATION_RETAIN)
@@ -59,5 +60,25 @@ public enum SnapCheck {
         print(failures == 0 ? "all steps match" : "\(failures) steps off")
         child.terminate()
         exit(failures == 0 ? 0 : 1)
+    }
+}
+
+/// The test window's content: dragging anywhere in it starts a file drag, like dragging a
+/// document out of Finder. It accepts no drops, so a drop back on it goes nowhere.
+final class DragSourceView: NSView, NSDraggingSource {
+    static let file: URL = {
+        let url = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("snap11-drag-test.txt")
+        try? "Snap11 drag test".write(to: url, atomically: true, encoding: .utf8)
+        return url
+    }()
+
+    override func mouseDragged(with event: NSEvent) {
+        let item = NSDraggingItem(pasteboardWriter: DragSourceView.file as NSURL)
+        item.setDraggingFrame(NSRect(x: 0, y: 0, width: 32, height: 32), contents: NSWorkspace.shared.icon(forFile: DragSourceView.file.path))
+        beginDraggingSession(with: [item], event: event, source: self)
+    }
+
+    func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
+        .copy
     }
 }

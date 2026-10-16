@@ -44,6 +44,17 @@ public enum DriveCheck {
         }
     }
 
+    private static func dockIcon(named title: String) -> CGRect? {
+        guard let dock = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock").first else { return nil }
+        let app = AXUIElementCreateApplication(dock.processIdentifier)
+        for list in (app.attr(kAXChildrenAttribute) as [AXUIElement]?) ?? [] {
+            for item in (list.attr(kAXChildrenAttribute) as [AXUIElement]?) ?? [] where (item.attr(kAXTitleAttribute) as String?) == title {
+                if let p = item.point(kAXPositionAttribute), let s = item.size(kAXSizeAttribute) { return CGRect(origin: p, size: s) }
+            }
+        }
+        return nil
+    }
+
     /// NSWorkspace only refreshes the frontmost app from run-loop notifications, and this
     /// check blocks its run loop, so ask Accessibility, which answers live.
     private static func frontPID() -> pid_t? {
@@ -191,6 +202,62 @@ public enum DriveCheck {
         let out = window.frame
         check(abs(out.width - floating.width) < 2 && abs(out.height - floating.height) < 2,
               "dragging the snapped window out restored its size (\(out.size), want \(floating.size))")
+
+        // Drag and drop: preview under the pointer, Dock spring-loading, the switcher mid-drag.
+        window.setFrame(CGRect(x: 300, y: 250, width: 600, height: 432))
+        window.focus()
+        usleep(500_000)
+        let start = CGPoint(x: 600, y: 450)
+        mouse(.mouseMoved, start)
+        mouse(.leftMouseDown, start)
+        var q = start
+        for _ in 0..<6 { q.x += 12; q.y += 8; mouse(.leftMouseDragged, q) }
+        usleep(400_000)
+        let previewLevel = Int(CGWindowLevelForKey(.floatingWindow))
+        let shown = windows(of: pid, level: previewLevel)
+        let expected = CGPoint(x: q.x + 4, y: q.y + 6)
+        let follows = shown.contains { abs($0.minX - expected.x) < 3 && abs($0.minY - expected.y) < 3 }
+        check(follows, "a file drag shows the preview under the pointer (\(shown), pointer \(q))")
+        if let cmuxIcon = dockIcon(named: "cmux") {
+            let target = CGPoint(x: cmuxIcon.midX, y: cmuxIcon.midY)
+            while abs(q.y - target.y) > 10 || abs(q.x - target.x) > 10 {
+                q.x += (target.x - q.x) / 6
+                q.y += (target.y - q.y) / 6
+                mouse(.leftMouseDragged, q)
+            }
+            for _ in 0..<15 { mouse(.leftMouseDragged, q); usleep(40_000) }
+            usleep(300_000)
+            check(name(frontPID()).hasPrefix("cmux"), "holding the drag on cmux's Dock icon brought cmux forward (\(name(frontPID())))")
+        } else {
+            check(false, "cmux is in the Dock")
+        }
+        // Cmd+Tab mid-drag, then hold over the test window's card to switch back to it.
+        modifiers(.maskCommand)
+        key(Key.tab, down: true, flags: .maskCommand)
+        key(Key.tab, down: false, flags: .maskCommand)
+        usleep(500_000)
+        let midDrag = panels(of: pid)
+        check(!midDrag.isEmpty, "Cmd+Tab mid-drag opens the switcher (\(midDrag))")
+        if let panel = midDrag.first {
+            // cmux is front now, so the test window is the second most recent: its card is
+            // second in the first row, past the 56pt padding and the first card.
+            let card = CGPoint(x: panel.minX + 56 + 375 + 26 + 100, y: panel.minY + 56 + 130)
+            while abs(q.y - card.y) > 10 || abs(q.x - card.x) > 10 {
+                q.x += (card.x - q.x) / 5
+                q.y += (card.y - q.y) / 5
+                mouse(.leftMouseDragged, q)
+            }
+            for _ in 0..<18 { mouse(.leftMouseDragged, q); usleep(40_000) }
+            usleep(300_000)
+            check(frontPID() == child.processIdentifier, "holding the drag over a card switched to it (\(name(frontPID())))")
+        }
+        modifiers([])
+        usleep(200_000)
+        let back = CGPoint(x: window.frame.midX, y: window.frame.midY)
+        mouse(.leftMouseDragged, back)
+        mouse(.leftMouseUp, back)
+        usleep(500_000)
+        check(windows(of: pid, level: Int(CGWindowLevelForKey(.floatingWindow))).isEmpty, "the preview went away on drop")
 
         let before = frontPID()
         modifiers(.maskCommand)

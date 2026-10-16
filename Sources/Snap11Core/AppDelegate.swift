@@ -18,6 +18,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         FocusHistory.shared.start()
         LayoutFlyout.shared.start()
         DragSnap.shared.start()
+        DragDrop.shared.start()
         registerHotkeys()
         SkyLight.setSystemSwitcherEnabled(false)
         modifierWatch = ListenTap([.flagsChanged]) { [weak self] _, event in
