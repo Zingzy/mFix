@@ -11,6 +11,11 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp ".build/$CONFIG/mFix" "$APP/Contents/MacOS/mFix"
 cp scripts/Info.plist "$APP/Contents/Info.plist"
+xcrun actool Resources/mFix.icon --compile "$APP/Contents/Resources" --app-icon mFix \
+    --platform macosx --target-device mac --minimum-deployment-target 26.0 \
+    --output-partial-info-plist /dev/null >/dev/null
+# actool exits 0 even when it compiles nothing.
+[ -f "$APP/Contents/Resources/Assets.car" ] || { echo "actool did not write Assets.car" >&2; exit 1; }
 if [ -n "${MFIX_VERSION:-}" ]; then
     plutil -replace CFBundleShortVersionString -string "$MFIX_VERSION" "$APP/Contents/Info.plist"
     plutil -replace CFBundleVersion -string "$MFIX_VERSION" "$APP/Contents/Info.plist"
