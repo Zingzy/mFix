@@ -10,12 +10,9 @@ Windows 11 window management for macOS 26. Yes, Windows. On purpose.
 
 **[Download mFix.dmg](https://github.com/Zingzy/mFix/releases/latest/download/mFix.dmg)**
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/snap-assist-dark.png">
-  <img src="docs/images/snap-assist-light.png" alt="A window snapped to the left half of the screen while mFix's Snap Assist offers the other open windows for the right half" width="860">
-</picture>
-
 </div>
+
+https://github.com/user-attachments/assets/cb47f1ad-abc9-484f-828c-516e2dddeee6
 
 ## The hot take
 
