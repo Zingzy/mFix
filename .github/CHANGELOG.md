@@ -2,6 +2,12 @@
 
 All notable changes to mFix are listed here. Versions follow [Semantic Versioning](https://semver.org).
 
+## [0.1.2] - 2026-10-17
+
+### Added
+
+- An app icon. mFix showed the blank placeholder in Spotlight, Finder and the Dock; it now has a Liquid Glass icon of a snap layout that follows light, dark, clear and tinted modes.
+
 ## [0.1.1] - 2026-10-17
 
 ### Fixed
@@ -49,5 +55,6 @@ The first public release. Requires macOS 26.
 
 - A settings window with a switch for every feature, and launch at login.
 
+[0.1.2]: https://github.com/Zingzy/mFix/releases/tag/v0.1.2
 [0.1.1]: https://github.com/Zingzy/mFix/releases/tag/v0.1.1
 [0.1.0]: https://github.com/Zingzy/mFix/releases/tag/v0.1.0
