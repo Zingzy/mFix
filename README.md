@@ -39,6 +39,14 @@ So mFix copies Windows. The snapping, the switcher, the taskbar habits, the Expl
 
 ## Install
 
+With Homebrew:
+
+```sh
+brew install --cask zingzy/tap/mfix
+```
+
+Or by hand:
+
 1. Download [mFix.dmg](https://github.com/Zingzy/mFix/releases/latest/download/mFix.dmg). It needs macOS 26 (Tahoe) or later.
 2. Drag mFix into Applications and open it.
 3. macOS blocks it, because notarizing costs $99 a year and this is free. Go to System Settings, Privacy & Security, scroll to Security and click **Open Anyway**. Or run this:
