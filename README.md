@@ -20,7 +20,7 @@ The Mac is sold as the productivity machine. It isn't. It's the pretty machine. 
 
 Use it for a week after Windows 11 and count how often you fight the window you're looking at. Windows does this part better. Not a little better. Much better. It hurts to type that, but it's true, and Apple has had 25 years to notice.
 
-So mFix copies Windows. The snapping, the switcher, the taskbar habits, the Explorer keys. Native Swift, no Electron: a 583 KB download that averaged 0.5% CPU over a day of real use.
+So mFix copies Windows. The snapping, the switcher, the taskbar habits, the Explorer keys. Native Swift, no Electron: a 583 KB download that averaged 0.5% CPU over 11 hours of real use.
 
 **F\*CK MACOS** window management. Here is the case.
 
