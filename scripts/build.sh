@@ -11,7 +11,7 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp ".build/$CONFIG/mFix" "$APP/Contents/MacOS/mFix"
 cp scripts/Info.plist "$APP/Contents/Info.plist"
-xcrun actool Resources/mFix.icon --compile "$APP/Contents/Resources" --app-icon mFix \
+xcrun actool "$PWD/Resources/mFix.icon" --compile "$PWD/$APP/Contents/Resources" --app-icon mFix \
     --platform macosx --target-device mac --minimum-deployment-target 26.0 \
     --output-partial-info-plist /dev/null >/dev/null
 # actool exits 0 even when it compiles nothing.
