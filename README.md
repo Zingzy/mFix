@@ -96,30 +96,32 @@ Macs don't have one, so mFix uses a chord. Below, **Win** means **Cmd+Option**. 
 
 The rules match the Windows 11 table, quarters included. Snap left, press Win+Up, and you're in the top left quarter. `swift test` checks the rules against that table.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/layouts-dark.png">
-  <img src="docs/images/layouts-light.png" alt="The Snap Layouts flyout under a window's green button, with suggested layouts showing app icons in their zones" width="560">
-</picture>
+<img src="docs/images/snap-keys.gif" alt="Win+Arrow snapping a terminal to the left half, then into quarters" width="800">
 
 **Snap Layouts.** Hover the green button for 600 ms and you get the Windows 11 grid of layouts instead of Apple's menu. Click a zone and the window goes there. The first one or two layouts are built from the windows you have open, with their icons in the zones. Pick one and they all land at once. Wide screens get six layouts, smaller ones four, portrait screens get stacked ones.
 
+<img src="docs/images/layouts.gif" alt="Hovering the green button opens the Snap Layouts grid; clicking a zone places the window" width="800">
+
 **Snap Assist.** After a window snaps, the empty part of the screen shows cards of your other windows. Pick one and it fills the gap. If more gaps are left, it moves to the next one. Arrows move, Enter picks, Esc stops, Delete closes the highlighted window.
 
+<img src="docs/images/snap-assist.gif" alt="After a snap, Snap Assist shows the other windows; picking one fills the other half" width="800">
+
 **Drag to snap.** Drag a window by its title bar to an edge for a half, a corner for a quarter, or the top to maximize. A preview shows where it lands. Esc cancels. Drag a snapped window away and it goes back to its old size, still under your pointer.
+
+<img src="docs/images/drag-snap.gif" alt="Dragging a Finder window into a corner and to the top edge snaps it" width="800">
 
 **Snap groups.** Windows you snap together through Snap Assist or a layout become a group. Resize one and its neighbours follow. The group is one card in the switcher, and picking it brings the whole group forward.
 
 **Divider handle.** Hover the line where two snapped windows touch and a handle appears. Drag it to resize both sides at once. It works on any snapped windows that touch, grouped or not.
+
+<img src="docs/images/divider.gif" alt="Dragging the line between two snapped windows resizes both" width="800">
 
 ## Switcher
 
 > **macOS:** Cmd+Tab shows apps, including ones with no windows open.
 > **mFix:** Cmd+Tab shows windows, like Alt+Tab on Windows 11.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/switcher-dark.png">
-  <img src="docs/images/switcher-light.png" alt="mFix's Cmd+Tab switcher showing one card per window, each with a live thumbnail, title and app icon" width="860">
-</picture>
+<img src="docs/images/switcher.gif" alt="Cmd+Tab in mFix: one live card per window across every Space" width="800">
 
 | Keys | What happens |
 |---|---|
@@ -154,15 +156,15 @@ Thumbnails refresh three times a second, and only while a panel is open. When no
 | Win+1 to Win+9 | The nth app in the Dock. Not running: open it. In the back: bring it forward. Already in front: step through its windows, or minimize it if it has one. |
 | Cmd+Shift+Esc | Open Activity Monitor, the closest thing to Task Manager a Mac has. |
 
+
+<img src="docs/images/dock-numbers.gif" alt="Win+2, Win+3 and Win+4 open the matching Dock apps" width="800">
+
 ## Dock
 
 > **macOS:** hover an icon, read the app's name.
 > **mFix:** hover an icon, see its windows.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/dock-dark.png">
-  <img src="docs/images/dock-light.png" alt="Window cards above a Dock icon, one for each of the app's windows" width="560">
-</picture>
+<img src="docs/images/dock.gif" alt="Hovering a Dock icon shows that app's windows as cards; clicking cycles them" width="800">
 
 - Hover a Dock icon and its windows appear as cards above it at once. Click a card to go to that window, on any Space. Click its X to close it. Once one preview is open, moving to the next icon switches right away.
 - The cards cover the Dock's name tooltip. That's as close as anyone has come to turning it off.
@@ -177,6 +179,9 @@ Thumbnails refresh three times a second, and only while a panel is open. When no
 - A small preview of what you're dragging sits next to the pointer: a stack of file thumbnails with a count, an image, or a snippet of text.
 - Hold a drag over an app's Dock icon for half a second and its window comes forward, even from another Space or a full screen Space. Drop right into it.
 - Cmd+Tab works while you drag. See [Switcher](#switcher).
+
+
+<img src="docs/images/drag-drop.gif" alt="Holding a dragged file over a Dock icon brings that window forward to drop into" width="800">
 
 ## Finder, but Explorer
 
@@ -196,6 +201,11 @@ They only apply when Finder is in front and focus is on files. Renaming, the sea
 | Cmd+Option+T | Hide the toolbar | Open this folder in a terminal |
 
 Cmd+V moves files into the selected folder when one is selected in list view, not just into the window's own folder. The terminal is Ghostty unless you pick cmux, iTerm, Warp or Terminal in Settings. mFix only lists the ones you have installed.
+
+
+<img src="docs/images/finder-cut.gif" alt="Cmd+X then Cmd+V moves a file in Finder" width="800">
+
+<img src="docs/images/finder-keys.gif" alt="Enter opens a file, Delete trashes and undoes, F2 renames" width="800">
 
 ## Always on Top
 
