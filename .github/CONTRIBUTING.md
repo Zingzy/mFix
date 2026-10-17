@@ -41,9 +41,13 @@ The rest of mFix is about real windows, so there are also checks built into the 
 | `--minimize-check` | Minimizes all but one test window and toggles them back. |
 | `--pin-check` | Pins a test window on top and checks it ends up above another one. |
 | `--render <dir>` | Builds the switcher, Snap Assist, the layouts flyout and the settings tabs off screen and writes them as PNGs. They show your real windows. |
+| `--live-bench` | Measures the CPU and memory cost of live thumbnails. |
+| `--list-bench` | Times listing windows, as Cmd+Tab and Snap Assist do. `MFIX_BENCH_PAUSE=75` waits between runs like an idle Mac. |
+| `--snap-bench` | Snaps a test window 50 times across zones and reports how long until WindowServer has it at the new frame. |
+| `--thumb-bench` | Times one round of thumbnails for every window on this Space. |
+| `--switcher-bench` | Times listing windows and building the Cmd+Tab panel off screen. |
 
 The README images come from `scripts/render-check.sh --readme`. It opens throwaway TextEdit, Preview, Dictionary and Tips windows, renders only those over a stock wallpaper in light and dark, and writes `docs/images/`. Your own windows never show up in them.
-| `--live-bench` | Measures the CPU and memory cost of live thumbnails. |
 
 Run them from the debug build, for example `.build/debug/mFix --snap-check`. `--pin-check` also waits for an idle Mac first. `MFIX_CHECK_NOW=1` skips that wait.
 

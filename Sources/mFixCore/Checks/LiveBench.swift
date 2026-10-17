@@ -46,6 +46,7 @@ public enum LiveBench {
     }
 
     public static func run() {
+        PerfBench.warmList()
         let windows = WindowList.currentSpace()
         print("windows on this Space:", windows.count, windows.map { "\($0.id) \($0.app?.localizedName ?? "?")" })
         let onScreen = Set(WindowInfo.onScreen.map(\.id))

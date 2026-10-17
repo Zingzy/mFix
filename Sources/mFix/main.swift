@@ -25,6 +25,12 @@ if let i = args.firstIndex(of: "--render"), args.count > i + 1 {
     }
 } else if args.contains("--list-bench") {
     MainActor.assumeIsolated { ListBench.run() }
+} else if args.contains("--snap-bench") {
+    MainActor.assumeIsolated { PerfBench.snap() }
+} else if args.contains("--thumb-bench") {
+    MainActor.assumeIsolated { PerfBench.thumbnails() }
+} else if args.contains("--switcher-bench") {
+    MainActor.assumeIsolated { PerfBench.switcher() }
 } else if args.contains("--live-bench") {
     MainActor.assumeIsolated { LiveBench.run() }
 } else if args.contains("--finder-probe") {
