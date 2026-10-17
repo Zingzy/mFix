@@ -16,6 +16,9 @@ jobs:
     name: Build and publish
     runs-on: macos-26
     timeout-minutes: 30
+    outputs:
+      version: ${{ steps.sums.outputs.version }}
+      dmg_sha: ${{ steps.sums.outputs.dmg_sha }}
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
     steps:
@@ -47,6 +50,7 @@ jobs:
       - name: Build the app and the disk image
         run: scripts/dmg.sh
       - name: Name the assets and write checksums
+        id: sums
         run: |
           mkdir dist
           cp build/mFix.dmg dist/mFix.dmg
@@ -54,6 +58,8 @@ jobs:
           cd dist
           shasum -a 256 mFix.dmg mFix.zip > SHA256SUMS.txt
           cat SHA256SUMS.txt
+          echo "version=$MFIX_VERSION" >> "$GITHUB_OUTPUT"
+          echo "dmg_sha=$(awk '$2 == "mFix.dmg" {print $1}' SHA256SUMS.txt)" >> "$GITHUB_OUTPUT"
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -64,3 +70,42 @@ jobs:
       - name: Remove the signing keychain
         if: always() && env.MFIX_KEYCHAIN != ''
         run: security delete-keychain "$MFIX_KEYCHAIN"
+
+  # The tap deploy key can push to Zingzy/homebrew-tap and nothing else. It lives only in this
+  # job, which gets read-only access to this repo.
+  cask:
+    name: Update the Homebrew cask
+    needs: release
+    if: github.repository == 'Zingzy/mFix'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Push the new version to the tap
+        env:
+          TAP_DEPLOY_KEY: ${{ secrets.TAP_DEPLOY_KEY }}
+          VERSION: ${{ needs.release.outputs.version }}
+          DMG_SHA: ${{ needs.release.outputs.dmg_sha }}
+        run: |
+          if [ -z "${TAP_DEPLOY_KEY:+set}" ]; then
+            echo "No TAP_DEPLOY_KEY secret, so the cask is left alone."
+            exit 0
+          fi
+          key="$RUNNER_TEMP/tap-key"
+          hosts="$RUNNER_TEMP/known_hosts"
+          trap 'rm -f "$key"' EXIT
+          (umask 077; printenv TAP_DEPLOY_KEY > "$key")
+          # GitHub's published host key, from https://api.github.com/meta.
+          echo "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl" > "$hosts"
+          export GIT_SSH_COMMAND="ssh -i $key -o IdentitiesOnly=yes -o UserKnownHostsFile=$hosts -o StrictHostKeyChecking=yes"
+          git clone --depth 1 git@github.com:Zingzy/homebrew-tap.git "$RUNNER_TEMP/tap"
+          scripts/bump-cask.sh "$RUNNER_TEMP/tap" "$VERSION" "$DMG_SHA"
+          cd "$RUNNER_TEMP/tap"
+          if git diff --quiet; then exit 0; fi
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q -am "Update mFix cask to $VERSION"
+          git push origin HEAD:main

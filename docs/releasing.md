@@ -71,3 +71,7 @@ Check what a build was signed with:
 codesign -dv --verbose=4 build/mFix.app 2>&1 | grep Authority
 codesign -d -r- build/mFix.app
 ```
+
+## Homebrew
+
+After a release is published, the `cask` job in `.github/workflows/release.yml` points `Casks/mfix.rb` in [Zingzy/homebrew-tap](https://github.com/Zingzy/homebrew-tap) at the new version and DMG checksum, using `scripts/bump-cask.sh`. It pushes with the `TAP_DEPLOY_KEY` secret: an SSH deploy key with write access to the tap repo and nothing else. Without the secret the job skips the update.
