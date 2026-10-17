@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/images/icon.png" alt="mFix icon" width="128">
+
 # mFix
 
 **The Mac, fixed.**
